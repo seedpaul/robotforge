@@ -1,4 +1,4 @@
-# RobotForge Companion 1.0.0
+# RobotForge Companion 1.1.0
 
 This companion lets the RobotForge web app build Java/C++/Python projects locally and deploy them to your FRC roboRIO using GradleRIO or RobotPy. It only accepts validated RobotForge configurations, not arbitrary source uploads or shell commands.
 
@@ -16,6 +16,8 @@ This companion lets the RobotForge web app build Java/C++/Python projects locall
 The companion does not control Driver Station or enable the robot. It cannot independently verify that your robot is disabled. USB addresses do not identify a team; physically verify the connected robot. Configure/image the roboRIO with the matching 2026 tools first. Standard default FRC SSH credentials are used by the official deployment tools; custom credentials require deploying the exported project with those tools directly.
 
 ## At events / offline
+
+Companion 1.1.0 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
 
 Complete an online build on this laptop for each language you plan to use before the event. **Use cached dependencies** skips network preparation; it fails if the required dependencies have not been cached. Java/C++ uploads always run Gradle offline. Python uploads use the requirements downloaded by RobotPy sync. Changing connection or configuration requires a new build. Build cancellation is available; upload cancellation is deliberately unavailable because interrupting a transfer may leave the roboRIO in an incomplete state. The 20-minute operation timeout still applies.
 
@@ -39,7 +41,7 @@ Set environment variables on the laptop before starting the companion. These set
 
 The service binds only to 127.0.0.1:5819. Every request checks the exact Origin and Host and uses a random 192-bit token, regenerated on restart. Pairing tokens stay in browser memory and are not included in backups. Requests are size limited. Jobs use fresh random directories, one operation at a time. Source/build files are hashed and rechecked before deployment. All executable names and arguments come from the companion, not the web client. Dependencies come from the pinned official project templates. Log history is capped at 80 KB.
 
-Builds remain in `~/.robotforge/builds` for review; the companion does not delete them. The Python environment remains in `~/.robotforge/python-2026.2.2`. Close the companion before manually removing old builds. Logs may contain local file paths. Do not share pairing codes. Close the companion after use.
+Builds remain in `~/.robotforge/builds` for review; the companion does not delete them. Python environments remain in `~/.robotforge/python-<requirement-hash>`. Close the companion before manually removing old builds. Logs may contain local file paths. Do not share pairing codes. Close the companion after use.
 
 ## Verification scope
 

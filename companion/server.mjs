@@ -4,11 +4,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
-import { projectSchema, validate, versions } from '../lib/robot-model.ts';
+import { projectSchema, validate } from '../lib/robot-model.ts';
 import { assembleProject } from '../lib/generator.ts';
+import { librarySettings } from '../lib/library-project.ts';
+import { getLibraryCatalog } from '../lib/library-service.ts';
+import { mergeNewer, pythonRequirements, selectedVendors, vendorRegistry } from '../lib/libraries.ts';
 
 export const PORT = 5819;
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 export const SITE = 'https://robot-forge-frc.paul-seed121071.chatgpt.site';
 const digest = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -48,11 +51,11 @@ export async function findJava() {
   return 'java';
 }
 
-export function createCompanion({ assets, root = path.join(os.homedir(), '.robotforge'), run = runProcess, token = randomBytes(24).toString('hex'), origins = [SITE], port = PORT }) {
+export function createCompanion({ assets, root = path.join(os.homedir(), '.robotforge'), run = runProcess, catalog = getLibraryCatalog, token = randomBytes(24).toString('hex'), origins = [SITE], port = PORT }) {
   const allowed = new Set(origins);
   let job = null, busy = false, lastStart = 0;
   const log = value => { if (job) job.log = (job.log + value.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')).slice(-80000); };
-  const publicJob = () => job ? { id: job.id, state: job.state, team: job.project.team, language: job.project.language, target: job.target, connection: job.connection, offline: job.offline, fingerprint: job.fingerprint, startedAt: job.startedAt, log: job.log, error: job.error || null } : null;
+  const publicJob = () => job ? { id: job.id, state: job.state, team: job.project.team, language: job.project.language, target: job.target, connection: job.connection, offline: job.offline, fingerprint: job.fingerprint, startedAt: job.startedAt, log: job.log, libraries: job.librarySummary || null, error: job.error || null } : null;
   const fingerprint = (project, connection, offline) => digest(JSON.stringify({ project, connection, offline }));
   async function execute(stage) {
     const current = job;
@@ -65,8 +68,20 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
     };
     try {
       if (stage === 'build') {
+        const settings = librarySettings(current.project);
+        let lock = settings.lock;
+        if (settings.mode === 'automatic' && !current.offline) {
+          log('Checking stable 2026 library releases…\n');
+          const available = await catalog();
+          lock = mergeNewer(lock, available.lock);
+          for (const warning of available.errors) log(`Update check: ${warning}\n`);
+        }
+        current.settings = { ...settings, lock };
+        current.buildProject = { ...current.project, libraries: { ...current.settings, mode: 'frozen' } };
+        current.librarySummary = [`WPILib ${lock.wpilib}`, `RobotPy ${lock.robotpy}`, ...selectedVendors(settings).map(id => `${vendorRegistry[id].name} ${current.project.language === 'Python' ? lock.vendors[id].python : lock.vendors[id].manifest.version}`)].join(' · ');
+        log(`Build library snapshot: ${current.librarySummary}\n`);
         await fs.mkdir(current.directory, { recursive: true });
-        const files = await assembleProject(current.project, async name => {
+        const files = await assembleProject(current.buildProject, async name => {
           if (!(name in assets)) throw Error(`Missing bundled template ${name}`);
           return Buffer.from(assets[name], 'base64');
         });
@@ -85,14 +100,15 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
         }
       }
       if (current.project.language === 'Python') {
-        const venv = path.join(root, `python-${versions.robotpy}`);
+        const requirements = pythonRequirements(current.settings.lock, current.settings.extras);
+        const venv = path.join(root, `python-${digest(JSON.stringify(requirements)).slice(0,16)}`);
         const python = path.join(venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
         if (stage === 'build') {
           if (!current.offline) {
             const launcher = process.env.ROBOTFORGE_PYTHON || (process.platform === 'win32' ? 'py' : 'python3.12');
             const prefix = process.platform === 'win32' && !process.env.ROBOTFORGE_PYTHON ? ['-3.12'] : [];
             await invoke(launcher, [...prefix, '-m', 'venv', venv]);
-            await invoke(python, ['-m', 'pip', 'install', `robotpy[commands2]==${versions.robotpy}`, `robotpy-rev==${versions.robotpyRev}`, `phoenix6==${versions.phoenix}`, `robotpy-pathplannerlib==${versions.pathplanner}`]);
+            await invoke(python, ['-m', 'pip', 'install', ...requirements]);
             // --no-install avoids RobotPy spawning an interactive installer window on Windows.
             await invoke(python, ['-m', 'robotpy', 'sync', '--no-install', '--no-upgrade-project']);
           }
@@ -137,7 +153,7 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
       const supplied = Buffer.from(req.headers.authorization || '');
       const expected = Buffer.from(`Bearer ${token}`);
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) fail('Pairing code is incorrect. Copy the code shown by your companion.', 401);
-      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: '1.0.0', job: publicJob() });
+      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: '1.1.0', job: publicJob() });
       if (req.method !== 'POST') fail('Not found.', 404);
       const data = await body(req);
       if (req.url === '/build') {

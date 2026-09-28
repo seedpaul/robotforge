@@ -9,3 +9,5 @@ Vendor metadata sources:
 - https://github.com/wpilibsuite/allwpilib/blob/v2026.2.1/wpilibNewCommands/WPILibNewCommands.json
 
 RobotForge is an independent tool and is not an official FIRST, WPILib, REV, CTRE, or PathPlanner product.
+
+Additional vendor metadata: Playing With Fusion (https://www.playingwithfusion.com/frc/playingwithfusion2026.json), Studica navX and PhotonVision (https://github.com/wpilibsuite/vendor-json-repo/tree/main/2026). Package binaries are obtained from their publishers during the local build; the website and companion bundle metadata only. Follow each publisher's license and hardware/firmware requirements.

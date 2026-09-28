@@ -5,17 +5,19 @@ import path from 'node:path';
 import http from 'node:http';
 import { createCompanion, targetFor } from './server.mjs';
 import { initialProject } from '../lib/robot-model.ts';
+import { bundledLock } from '../lib/library-project.ts';
 const assets = JSON.parse(await fs.readFile('.verification/companion/assets.json', 'utf8'));
 const origin = 'http://127.0.0.1:3107';
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'robotforge-test-'));
 let mode = 'pass';
+let catalogChecks = 0;
 const calls = [];
 const run = async (command, args, { signal, log }) => {
   calls.push({ command, args }); log('Simulated tool output; no robot is contacted.\n');
   if (mode === 'fail') throw Error('Intentional compiler failure');
   if (mode === 'wait') await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(Error('Cancelled')), { once: true }));
 };
-const bridge = createCompanion({ assets, root, port: 0, origins: [origin], run });
+const bridge = createCompanion({ assets, root, port: 0, origins: [origin], run, catalog: async()=>{catalogChecks++;return {lock:bundledLock,errors:[]};} });
 await bridge.start();
 const url = `http://127.0.0.1:${bridge.server.address().port}`;
 const headers = { Origin: origin, Authorization: `Bearer ${bridge.token}`, 'Content-Type': 'application/json' };
@@ -71,5 +73,13 @@ try {
   await api('/deploy', { ...input, id: job.id, confirmTeam: '9999', disabled: true });
   assert.equal((await finish()).state, 'failed');
   assert.equal(targetFor(9999, 'usb'), '172.22.11.2');
+  for(const offline of [false,true]) {
+    await next(); const before = catalogChecks;
+    const pinned = {...input,offline,project:{...project,libraries:{mode:'frozen',extras:['pwf'],lock:bundledLock}}};
+    await api('/build',pinned); const result = await finish(); assert.equal(result.state,'ready');
+    assert.equal(catalogChecks,before,'Frozen builds must never resolve new releases');
+    assert.ok(result.libraries.includes('Playing With Fusion'));
+  }
+  assert.ok(catalogChecks>=3,'Automatic builds should check releases');
   console.log('PASS: origin/host/token checks, strict configuration, three language workflows, build-before-deploy, typed team confirmation, disabled acknowledgement, stale configuration, tool failure, concurrent jobs, cancellation, and file integrity. No physical robot contacted.');
 } finally { await bridge.stop(); }

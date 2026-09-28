@@ -1,12 +1,11 @@
-import ts from 'typescript';
+import {rolldown} from 'rolldown';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const root=process.cwd();const tmp=path.join(root,'.verification/js');await fs.mkdir(tmp,{recursive:true});
-for(const name of ['robot-model','zip','generator','gen-java','gen-python','gen-cpp']){const source=await fs.readFile(`lib/${name}.ts`,'utf8');const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from '(.\/[\w-]+)'/g,"from '$1.mjs'");await fs.writeFile(path.join(tmp,name+'.mjs'),js);}
-const {initialProject,validate,parseProject}=await import('../.verification/js/robot-model.mjs');
-const {assembleProject,pathFiles}=await import('../.verification/js/generator.mjs');
-const {zip}=await import('../.verification/js/zip.mjs');
+const root=process.cwd();
+const bundle=await rolldown({input:'scripts/library-test-entry.mjs',platform:'node',external:[/^node:/]});
+await bundle.write({file:'.verification/generator-test.mjs',format:'esm'});await bundle.close();
+const {initialProject,validate,parseProject,assembleProject,pathFiles,zip}=await import('../.verification/generator-test.mjs');
 const fixture=()=>({...structuredClone(initialProject),team:9999});
 const good=fixture();assert.equal(validate(good).filter(x=>x.level==='error').length,0);
 const cases=[['CAN collision',p=>p.motors[1].can=p.motors[0].can],['Controller port collision',p=>p.controls.operatorPort=p.controls.driverPort],['Unknown command',p=>p.bindings[0].command='missing'],['Output overflow',p=>p.commands[0].output=3],['Path too fast',p=>p.auto.maxSpeed=6],['Coincident waypoints',p=>p.auto.waypoints[1]=p.auto.waypoints[0]],['Invalid drive role',p=>p.motors[0].role='mechanism'],['NaN input',p=>p.drive.mass=NaN],['Unknown subsystem',p=>p.motors[0].subsystem='missing'],['Missing team',p=>p.team=0]];

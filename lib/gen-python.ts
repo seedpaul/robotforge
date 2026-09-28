@@ -1,5 +1,5 @@
 import type { Project } from './robot-model';
-import { versions } from './robot-model';
+import { pythonProjectFile } from './library-project';
 export function pythonSources(p:Project):Record<string,string>{return {
 'robot.py':`import commands2
 import wpilib
@@ -251,5 +251,5 @@ class Drive(commands2.Subsystem):
         wpilib.SmartDashboard.putNumber('Drive/right meters', self.distance(self.right))
         wpilib.SmartDashboard.putBoolean('Drive/auto configured', self.auto_ready)
 `,
-'pyproject.toml':`[tool.robotpy]\nrobotpy_version = "${versions.robotpy}"\ncomponents = ["commands2"]\nrequires = ["robotpy-rev==${versions.robotpyRev}", "phoenix6==${versions.phoenix}", "robotpy-pathplannerlib==${versions.pathplanner}"]\n`,
+'pyproject.toml':pythonProjectFile(p),
 };}

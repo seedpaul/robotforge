@@ -8,6 +8,7 @@
   "scripts": {
     "prebuild": "node scripts/package-companion.mjs",
     "test:companion": "node scripts/package-companion.mjs && node scripts/verify-companion.mjs",
+    "test:libraries": "node scripts/verify-libraries.mjs",
     "install:ci": "node scripts/install-ci.mjs",
     "dev": "node scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",

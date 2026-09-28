@@ -5,7 +5,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { projectSchema, type Project } from '@/lib/robot-model';
 
-type Job = { id: string; state: 'building'|'ready'|'deploying'|'deployed'|'failed'|'cancelled'; team: number; language: string; target: string; fingerprint: string; log: string; error: string|null };
+type Job = { id: string; state: 'building'|'ready'|'deploying'|'deployed'|'failed'|'cancelled'; team: number; language: string; target: string; fingerprint: string; log: string; error: string|null; libraries?: string|null };
 const BRIDGE = 'http://127.0.0.1:5819';
 // Pairing credentials never enter project backups, cloud storage, or persistent browser storage.
 const session: { token: string; builtPayload: string } = { token: '', builtPayload: '' };
@@ -30,7 +30,7 @@ export default function DeployView({ project, blocked }: { project: Project; blo
   }
   async function connect() {
     setWorking(true); setError('');
-    try { const result = await request('/status', undefined, code.trim()); if (result.protocol !== 1) throw Error('Download the latest companion to continue.'); session.token = code.trim(); setJob(result.job); setPaired(true); }
+    try { const result = await request('/status', undefined, code.trim()); if (result.protocol !== 2) throw Error('Download the latest companion to continue.'); session.token = code.trim(); setJob(result.job); setPaired(true); }
     catch (e) { setError((e as Error).message); setPaired(false); }
     finally { setWorking(false); }
   }
@@ -70,7 +70,7 @@ export default function DeployView({ project, blocked }: { project: Project; blo
       <p className="deploy-hint">Build while connected to the internet first. Then join your robot network or connect USB. Keep the robot disabled during deployment.</p>
     </>}
     {error && <div className="issue error" role="alert"><div>{error}{paired && <button className="text-button" onClick={()=>{setPaired(false);setJob(null);setError('');session.token='';setCode('');}}>Pair again (current operation continues)</button>}</div></div>}
-    {job && <div className="deploy-result"><div className="deploy-result-header" role="status"><strong>{labels[job.state]}</strong><span>Team {job.team} · {job.language} · {job.target}</span></div>{job.state === 'deploying' && <p>Keep the robot powered and the companion open. An upload cannot be safely cancelled here.</p>}{job.state === 'deployed' && <p>Confirm code status in Driver Station and inspect robot logs before enabling. Tool success does not verify hardware behavior.</p>}<details open={running || job.state === 'failed'}><summary><Terminal size={15}/> Build & deployment log</summary><pre className="deployment-log" aria-label="Build and deployment log">{job.log || 'Waiting for build output…'}</pre></details></div>}
+    {job && <div className="deploy-result"><div className="deploy-result-header" role="status"><strong>{labels[job.state]}</strong><span>Team {job.team} · {job.language} · {job.target}</span></div>{job.state === 'deploying' && <p>Keep the robot powered and the companion open. An upload cannot be safely cancelled here.</p>}{job.state === 'deployed' && <p>Confirm code status in Driver Station and inspect robot logs before enabling. Tool success does not verify hardware behavior.</p>}<p className="deploy-hint">{job.libraries}</p><details open={running || job.state === 'failed'}><summary><Terminal size={15}/> Build & deployment log</summary><pre className="deployment-log" aria-label="Build and deployment log">{job.log || 'Waiting for build output…'}</pre></details></div>}
     <AlertDialog open={review} onOpenChange={setReview}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Deploy to Team {job?.team}?</AlertDialogTitle><AlertDialogDescription>This replaces the robot program and deployed path files at {job?.target}. The robot program restarts after upload. Verify the connected robot before continuing.</AlertDialogDescription></AlertDialogHeader><label className="form-field">Type team number {job?.team}<input inputMode="numeric" value={team} onChange={e=>setTeam(e.target.value)} autoComplete="off"/></label><label className="deploy-check"><input type="checkbox" checked={disabled} onChange={e=>setDisabled(e.target.checked)}/><span>I verified this is our robot, it is disabled, and it is safe to update.</span></label><AlertDialogFooter><AlertDialogCancel>Go back</AlertDialogCancel><AlertDialogAction disabled={!canDeploy || team !== String(job?.team) || !disabled} onClick={()=>act('deploy')}>Deploy robot code</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </section>;
 }
