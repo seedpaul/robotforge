@@ -16,7 +16,8 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "test:hardware": "node scripts/verify-hardware.mjs",
-    "test:routines": "node scripts/verify-routines.mjs"
+    "test:routines": "node scripts/verify-routines.mjs",
+    "test:development": "node scripts/verify-development.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

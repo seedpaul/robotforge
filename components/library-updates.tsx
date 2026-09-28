@@ -8,7 +8,7 @@ import { librarySettings,hardwareVendors,projectLibraryLock } from '@/lib/librar
 import { vendorIds, vendorRegistry, lockKey, mergeNewer, validateLibraryLock, type LibraryCatalog, type LibrarySettings } from '@/lib/libraries';
 import { download } from '@/lib/zip';
 
-export function useLibraryUpdates(ready: boolean, project: Project, update: (patch: Partial<Project>)=>void) {
+export function useLibraryUpdates(ready: boolean, project: Project, update: (patch: Partial<Project>, expected?:Project)=>void) {
   const latest = useRef({ project, update });
   useEffect(() => { latest.current = { project, update }; }, [project, update]);
   const [catalog, setCatalog] = useState<LibraryCatalog|null>(null), [checking, setChecking] = useState(false), [error, setError] = useState('');
@@ -26,7 +26,7 @@ export function useLibraryUpdates(ready: boolean, project: Project, update: (pat
       if (settings.mode === 'automatic') {
         const lock = projectLibraryLock(state.project,mergeNewer(settings.lock, result.lock));
         if (!state.project.libraries || lockKey(lock) !== lockKey(settings.lock)) {
-          state.update({ libraries: { ...settings, lock, previous: settings.lock } });
+          state.update({ libraries: { ...settings, lock, previous: settings.lock } },state.project);
           if (state.project.libraries) toast.info('Stable library updates applied. Build and test before deploying.');
         }
       }

@@ -6,3 +6,5 @@ export * from '../lib/generator.ts';
 export * from '../lib/zip.ts';
 export * from '../lib/hardware-catalog.ts';
 export * from '../lib/routines.ts';
+export * from '../lib/development.ts';
+export * from '../lib/checkpoint-store.ts';

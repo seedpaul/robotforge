@@ -17,6 +17,7 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 - Xbox and joystick USB ports, raw axes, button mapping, deadband, and teleop output cap
 - Bézier route editor, geometry playback, sequential autonomous, native PathPlanner 2026 files
 - Java, C++, and Python source previews and real ZIP downloads, including dependency/build metadata
+- Development checkpoints, change comparisons, recovery before imports/restores, and incremental mechanism additions
 - Validation, commissioning checklist, local autosave, JSON backup/import, accessible responsive interface
 - Paired local companion with build logs, cached/offline builds, and explicit team-confirmed deployment to a roboRIO using GradleRIO or RobotPy
 
@@ -85,3 +86,21 @@ Run `npm run test:hardware` for addressing, bus restrictions, module links, lang
 Routines are saved with the existing project JSON, selectable in Controls and Autonomous, and described in each export's `LOGIC.md`. Existing projects without routines still load. Companion 1.3.0 (protocol 4) is required so that older companions cannot omit routine data. There is no Blockly XML import, arbitrary source block, recursive routine nesting, or source-to-visual round trip.
 
 Run `npm run test:routines` to validate the model and generate Java/C++/Python fixtures under `.verification/routines-*`. Build the Java and C++ fixtures with GradleRIO. The Python fixture includes four RobotPy builtin lifecycle tests and the scheduler checks from `scripts/verify-routines-runtime.py`; run `python -m robotpy test` in that fixture. See [DESIGN-NOTES.md](DESIGN-NOTES.md) for the reference assessment and design decisions.
+
+
+## Iterative development
+
+Continue the same working robot project throughout the season. **Development** provides named checkpoints with notes and captures the complete configuration plus resolved dependency versions. Saving a draft does not imply it has passed a build or physical test. Up to 40 checkpoints are kept in this browser's IndexedDB; the active project continues to autosave separately.
+
+1. Save a milestone before changing the design, with notes on what has been tested.
+2. Use **Add a mechanism** for a subsystem-only starting point or a subsystem, CAN motor, and bounded starter command. Existing IDs, controls, routines, and autonomous assignments remain in place. The shortcut suggests an unused roboRIO CAN ID; adjust it to match the physical controller.
+3. Use Hardware, Subsystems, Commands, Logic builder, Controls, and Autonomous to refine the design. Compare against any checkpoint to see added, removed, or changed items, scalar before/after values, and changed collection summaries.
+4. Build and test the new revision, then save another checkpoint. Restoration freezes the captured dependencies and clears bench confirmations; it requires another build and explicit deployment to change a robot.
+
+The mechanism shortcut, project import, and checkpoint restore first commit a recovery checkpoint. If checkpoint storage is unavailable, full, or fails, the replacement is cancelled and the current project remains. Imports show a change review before replacement. Unreadable active-project data is retained for recovery instead of overwritten by the default project.
+
+**Download history** transfers milestones and notes to another browser using **Import history**. History imports merge identical checkpoints, reject conflicting identifiers, and leave the active design untouched. A single checkpoint can also be downloaded as a frozen project backup. Download backups regularly: clearing browser data removes local history, and no cloud team synchronization is provided.
+
+Checkpoints archive configuration and dependencies, not robot binaries, firmware, or handwritten source. Regeneration produces a complete project and does not merge custom source changes. Keep exported code and custom work in version control.
+
+Run `npm run test:development` for snapshot immutability, preserved assignments, incremental additions, CAN collisions, comparisons, restoration, backup round trips and merge limits, and generated exports before/after changes in Java, C++, and Python. Browser verification covers checkpoint creation, adding a motor/subsystem/command, restoration, import review and recovery, history import, reload persistence, and responsive layout.
