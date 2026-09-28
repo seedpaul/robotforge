@@ -174,7 +174,7 @@ class Drive(commands2.Subsystem):
         self.left = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'left']
         self.right = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'right']
         self.gyro = Pigeon2(self.d['gyroCan']) if self.d['gyro'] == 'Pigeon2' else wpilib.ADXRS450_Gyro()
-        if self.d['gyro'] == 'ADXRS450':
+        if self.d['gyro'] == 'ADXRS450' and wpilib.RobotBase.isReal():
             self.gyro.calibrate()
         self.meters_per_rotation = math.pi * self.d['wheelDiameter'] / self.d['gearing']
         self.kinematics = DifferentialDriveKinematics(self.d['trackWidth'])
@@ -251,7 +251,5 @@ class Drive(commands2.Subsystem):
         wpilib.SmartDashboard.putNumber('Drive/right meters', self.distance(self.right))
         wpilib.SmartDashboard.putBoolean('Drive/auto configured', self.auto_ready)
 `,
-'pyproject.toml':`[tool.robotpy]\nrobotpy_version = "${versions.robotpy}"\nrobotpy_extras = ["commands2"]\nrequires = ["robotpy-rev==${versions.robotpyRev}", "phoenix6==${versions.phoenix}", "robotpy-pathplannerlib==${versions.pathplanner}"]\n`,
+'pyproject.toml':`[tool.robotpy]\nrobotpy_version = "${versions.robotpy}"\ncomponents = ["commands2"]\nrequires = ["robotpy-rev==${versions.robotpyRev}", "phoenix6==${versions.phoenix}", "robotpy-pathplannerlib==${versions.pathplanner}"]\n`,
 };}
-
-

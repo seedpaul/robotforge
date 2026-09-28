@@ -6,6 +6,8 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "prebuild": "node scripts/package-companion.mjs",
+    "test:companion": "node scripts/package-companion.mjs && node scripts/verify-companion.mjs",
     "install:ci": "node scripts/install-ci.mjs",
     "dev": "node scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",

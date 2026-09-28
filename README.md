@@ -15,14 +15,23 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 - Bézier route editor, geometry playback, sequential autonomous, native PathPlanner 2026 files
 - Java, C++, and Python source previews and real ZIP downloads, including dependency/build metadata
 - Validation, commissioning checklist, local autosave, JSON backup/import, accessible responsive interface
+- Paired local companion with build logs, cached/offline builds, and explicit team-confirmed deployment to a roboRIO using GradleRIO or RobotPy
 
 Robot projects use pinned WPILib/GradleRIO 2026.2.1, RobotPy 2026.2.2, REVLib 2026.0.5 (Python binding 2026.0.4), Phoenix 6 26.3.0, and PathPlannerLib 2026.1.2. Versions were checked against upstream metadata on 2026-09-28.
+
+## Deploy from the browser
+
+In **Code & export**, download the companion, extract it, and open `Start RobotForge.cmd` on a Windows laptop with Node.js and the 2026 WPILib tools installed. Python projects require Python 3.12. Pair the browser with the code shown in its window, build while online, then connect to the robot network or USB and choose **Review & deploy**. See [the companion guide](companion/README.md) for setup, custom tool locations, offline behavior, and limitations.
+
+`node scripts/package-companion.mjs` builds the downloadable companion from the same schema and generators as the app. Run it after changing generators, vendor files, or companion code, before building the site. `node scripts/verify-companion.mjs` tests authorization, validation, build/deploy sequencing, stale builds, failures, and cancellation without contacting a robot.
 
 ## Validation
 
 `node scripts/verify-generator.mjs` checks invalid configuration rejection, generates three language fixtures, and verifies path geometry. `node node_modules/typescript/bin/tsc --noEmit` checks the web application.
 
 Generated fixtures are under ignored `.verification/`. Java compilation, C++ roboRIO compilation/linking, Python vendor-library startup, PathPlanner parsing, and command lifecycle checks are performed separately. No physical robot was connected or deployed.
+
+The companion was exercised on Windows with a real Java build and native dependency preparation, C++ roboRIO compilation/linking, and Python environment installation, RoboRIO dependency synchronization, syntax checking, and all four RobotPy builtin tests. Upload commands were tested with an injected runner; physical uploads were disabled during verification. The updated site passed its production build and TypeScript checks. Interactive browser verification of this update was blocked by the browser tool's URL policy.
 
 ## Scope and limitations
 
