@@ -12,6 +12,8 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 - CAN and PWM motor controllers, named CANivore buses, validated I/O allocation, automatic vendor dependencies, and wiring inventory
 - Differential drivetrain with two motors per side, integrated encoders, ADXRS450, Pigeon 2, or navX gyro
 - Mechanism subsystems, bounded motor / servo / pneumatic / LED commands, sensor stop conditions, and active-low forward DIO limits
+- Mechanism map linking devices to commands and their uses; a guided build order with actionable configuration findings
+- Visual routines with action/wait blocks, sequence and parallel/race/deadline composition, live Java/C++/Python factories, undo, and controller/autonomous reuse
 - Xbox and joystick USB ports, raw axes, button mapping, deadband, and teleop output cap
 - Bézier route editor, geometry playback, sequential autonomous, native PathPlanner 2026 files
 - Java, C++, and Python source previews and real ZIP downloads, including dependency/build metadata
@@ -32,7 +34,7 @@ In **Code & export**, download the companion, extract it, and open `Start RobotF
 
 Automatic mode adopts newer stable releases within 2026. Freeze a project before competition, restore its previous version set, or save a version snapshot. Failed checks keep saved versions and report which feeds failed; they never downgrade a project. Native vendor versions and Python bindings are tracked independently. New seasons, prereleases, unknown repositories, and unexpected vendor identities are excluded. The shared API caches successful release checks for one hour; incomplete or manually requested checks can refresh after one minute. Checks happen on use, not while the application and companion are both closed.
 
-Every archive contains `robotforge-libraries.lock.json`, pinned vendordeps or Python requirements, and a frozen project backup. Companion jobs resolve once, print their selected versions, and deploy that same successful build. Python environments are isolated by the selected requirement set. The new protocol requires Companion 1.2.0; download the updated ZIP in the app.
+Every archive contains `robotforge-libraries.lock.json`, pinned vendordeps or Python requirements, and a frozen project backup. Companion jobs resolve once, print their selected versions, and deploy that same successful build. Python environments are isolated by the selected requirement set. The new protocol requires Companion 1.3.0; download the updated ZIP in the app.
 
 Additional vendor switches install APIs; they do not generate device integration logic for unsupported hardware. Library metadata cannot automatically migrate generated source across a breaking API change, install roboRIO firmware, update the locally installed WPILib toolchain, or port projects to another season. Such updates require code/tooling changes and testing. Compilation failures block robot deployment.
 
@@ -75,3 +77,11 @@ The implemented peripheral adapters are compiled in Java and C++ against the 202
 Thrifty Nova uses ThriftyLib in Java; no C++ or Python implementation is claimed. Legacy CTRE Python requires a compatible Phoenix 6 package, currently 26.1.3 with robotpy-ctre 2026.1.0.1. Official package metadata is checked for this dependency constraint and exact compatible versions are saved in the build lock. This can select an older Phoenix 6 release for compatibility; projects without legacy CTRE continue using the latest stable Phoenix 6.
 
 Run `npm run test:hardware` for addressing, bus restrictions, module links, language availability, generation, and automatic dependency tests. Copy `scripts/verify-hardware-runtime.py` to the generated Python fixture’s tests directory and run `python -m robotpy test`.
+
+## Visual routines
+
+**Logic builder** composes existing commands into typed blocks. Together blocks support all-finish, first-finish, and first-action-as-deadline behavior. Shared-subsystem concurrency, missing references, and malformed projects block export. Routine factories create fresh command instances and preserve each action's stop behavior. A routine reserves all of its subsystems throughout its sequence, including waits. An invalid sensor stops its action; it does not automatically abort later blocks. The displayed duration is a timeout estimate, not a physics simulation.
+
+Routines are saved with the existing project JSON, selectable in Controls and Autonomous, and described in each export's `LOGIC.md`. Existing projects without routines still load. Companion 1.3.0 (protocol 4) is required so that older companions cannot omit routine data. There is no Blockly XML import, arbitrary source block, recursive routine nesting, or source-to-visual round trip.
+
+Run `npm run test:routines` to validate the model and generate Java/C++/Python fixtures under `.verification/routines-*`. Build the Java and C++ fixtures with GradleRIO. The Python fixture includes four RobotPy builtin lifecycle tests and the scheduler checks from `scripts/verify-routines-runtime.py`; run `python -m robotpy test` in that fixture. See [DESIGN-NOTES.md](DESIGN-NOTES.md) for the reference assessment and design decisions.

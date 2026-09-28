@@ -1,3 +1,4 @@
+import { routineSource } from './routines';
 import { pythonMotor } from './gen-motors';
 import { navxPort } from './gen-devices';
 import type { Project } from './robot-model';
@@ -24,7 +25,7 @@ class Robot(wpilib.TimedRobot):
         self.operator = wpilib.Joystick(CONFIG['controls']['operatorPort'])
         self.mechanisms = {s['id']: Mechanism(s['name'], [MotorIO(m) for m in CONFIG['motors'] if m['subsystem'] == s['id']]) for s in CONFIG['subsystems'] if s['id'] != 'drive'}
         self.drive.setDefaultCommand(self.drive.runEnd(self.teleop_drive, self.drive.stop))
-        for command in CONFIG['commands']:
+        for command in CONFIG['commands'] + CONFIG.get('routines', []):
             NamedCommands.registerCommand(command['id'], self.action(command['id']))
         self.triggers = []
         for binding in CONFIG['bindings']:
@@ -43,7 +44,10 @@ class Robot(wpilib.TimedRobot):
         wpilib.SmartDashboard.putData('Auto chooser', self.chooser)
         self.autonomous = None
 
+    ${(p.routines||[]).map(r=>routineSource(r,'Python').replaceAll('\n','\n    ')).join('\n\n    ')}
+
     def action(self, command_id):
+        ${(p.routines||[]).map(r=>`if command_id == ${JSON.stringify(r.id)}: return self.routine_${r.id}()`).join('\n        ')}
         c = next(c for c in CONFIG['commands'] if c['id'] == command_id)
         owner = self.mechanisms[c['subsystem']]
         stop = getattr(self.hardware, 'stop_' + c['device']) if c.get('device') else owner.stop

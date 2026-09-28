@@ -8,7 +8,7 @@ import { Project, initialProject, parseProject, validate, projectSchema } from '
 import { Overview, StudioView } from '@/components/studio-views';
 import { download } from '@/lib/zip';
 import LibraryUpdates,{useLibraryUpdates} from '@/components/library-updates';
-const navigation=[{name:'Overview',icon:LayoutDashboard},{name:'Hardware',icon:Cable},{name:'Subsystems',icon:Boxes},{name:'Commands',icon:Zap},{name:'Controls',icon:Gamepad2},{name:'Autonomous',icon:Route},{name:'Code & export',icon:Code2},{name:'Libraries & updates',icon:Settings2},{name:'Preflight',icon:ShieldCheck}];
+const navigation=[{name:'Overview',icon:LayoutDashboard},{name:'Hardware',icon:Cable},{name:'Subsystems',icon:Boxes},{name:'Commands',icon:Zap},{name:'Logic builder',icon:Boxes},{name:'Controls',icon:Gamepad2},{name:'Autonomous',icon:Route},{name:'Code & export',icon:Code2},{name:'Libraries & updates',icon:Settings2},{name:'Preflight',icon:ShieldCheck}];
 const KEY='robotforge-project-v1';
 export default function Home(){
  const [tab,setTab]=useState('Overview');const [project,setProject]=useState<Project>(initialProject);const [ready,setReady]=useState(false);const [saveStatus,setSaveStatus]=useState('Loading local project');const input=useRef<HTMLInputElement>(null);
@@ -16,6 +16,7 @@ export default function Home(){
  useEffect(()=>{if(!ready)return;if(!projectSchema.safeParse(project).success){setSaveStatus('Invalid draft — fix values to save');return;}try{localStorage.setItem(KEY,JSON.stringify(project));setSaveStatus('Saved on this device');}catch{setSaveStatus('Not saved — download a backup');toast.error('Browser storage is unavailable. Download a project backup.');}},[project,ready]);
  const update=(patch:Partial<Project>)=>setProject(p=>({...p,...patch,checks:patch.checks??{}}));
  const libraryStatus=useLibraryUpdates(ready,project,update);
+ useEffect(()=>{window.scrollTo({top:0,behavior:'instant'});},[tab]);
  const issues=useMemo(()=>validate(project),[project]);
  const latest=useRef({project,issues});latest.current={project,issues};
  useEffect(()=>{const context=(document as unknown as {modelContext?:{registerTool:(t:unknown,o:unknown)=>void}}).modelContext;if(!context?.registerTool)return;const abort=new AbortController();try{context.registerTool({name:'read_robot_configuration',title:'Read robot configuration',description:'Read the local robot project and validation findings without modifying it.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:(args:unknown)=>{if(!args||typeof args!=='object'||Object.keys(args).length)throw Error('Expected an empty object');return latest.current;}},{signal:abort.signal});context.registerTool({name:'navigate_robot_editor',title:'Open a robot editor',description:'Open a section of the robot workspace. Does not change robot settings or export files.',inputSchema:{type:'object',properties:{section:{type:'string',enum:navigation.map(n=>n.name)}},required:['section'],additionalProperties:false},annotations:{readOnlyHint:false},execute:(args:unknown)=>{const a=args as {section:string};if(!a||Object.keys(a).length!==1||!navigation.some(n=>n.name===a.section))throw Error('Unknown editor section');setTab(a.section);return {opened:a.section};}},{signal:abort.signal});}catch{/* Optional browser capability. */}return()=>abort.abort();},[]);

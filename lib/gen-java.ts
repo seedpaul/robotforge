@@ -1,3 +1,4 @@
+import { routineSource } from './routines';
 import { javaMotor } from './gen-motors';
 import { javaAction } from './gen-actions';
 import { navxPort } from './gen-devices';
@@ -110,13 +111,14 @@ public final class RobotContainer {
   private final SendableChooser<Command> chooser=new SendableChooser<>();
   public RobotContainer() {
     drive.setDefaultCommand(drive.runEnd(()->drive.arcade(${c.forwardSign}*MathUtil.applyDeadband(driver.getRawAxis(${c.forwardAxis}),${c.deadband}),${c.turnSign}*MathUtil.applyDeadband(driver.getRawAxis(${c.turnAxis}),${c.deadband})),drive::stop));
-    ${p.commands.map(x=>`NamedCommands.registerCommand(${q(x.id)},action_${x.id}());`).join('\n    ')}
+    ${[...p.commands,...(p.routines||[])].map(x=>`NamedCommands.registerCommand(${q(x.id)},action_${x.id}());`).join('\n    ')}
     ${p.bindings.map(b=>`new Trigger(()->DriverStation.isTeleopEnabled() && ${b.controller}.getRawButton(${b.button})).${b.behavior==='whileHeld'?'whileTrue':b.behavior==='onPress'?'onTrue':'toggleOnTrue'}(action_${b.command}());`).join('\n    ')}
     chooser.setDefaultOption("Do nothing",Commands.none());
     if(drive.autoReady()) try { chooser.addOption(${q(p.auto.name)},new PathPlannerAuto(${q(p.auto.name)}).withTimeout(15).finallyDo(interrupted->stopAll())); } catch(Exception e) { DriverStation.reportError("Auto failed to load: "+e.getMessage(),false); }
     SmartDashboard.putData("Auto chooser",chooser);
   }
   ${p.commands.map(javaAction).join('\n  ')}
+  ${(p.routines||[]).map(r=>routineSource(r,'Java')).join('\n  ')}
   public Command autonomous() { return chooser.getSelected(); }
   public void stopAll() { drive.stop(); hardware.stopAll(); ${mechanisms.map(s=>`mechanism_${s.id}.stop();`).join(' ')} }
 }

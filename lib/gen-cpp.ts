@@ -1,3 +1,4 @@
+import { routineSource } from './routines';
 import { cppMotor } from './gen-motors';
 import { cppAction } from './gen-actions';
 import { navxPort } from './gen-devices';
@@ -94,12 +95,13 @@ class Robot:public frc::TimedRobot {
   frc2::Command* selected=nullptr;
   double Deadband(double value){return std::abs(value)<=${c.deadband}?0:std::copysign((std::abs(value)-${c.deadband})/(1-${c.deadband}),value);}
   ${p.commands.map(cppAction).join('\n  ')}
+  ${(p.routines||[]).map(r=>routineSource(r,'C++')).join('\n  ')}
   void StopAll(){drive.Stop();hardware.StopAll();${mechanisms.map(s=>`mechanism_${s.id}.Stop();`).join('')}}
 public:
   void RobotInit() override {
     frc::DataLogManager::Start();frc::DriverStation::StartDataLog(frc::DataLogManager::GetLog());
     drive.SetDefaultCommand(drive.RunEnd([this]{drive.Arcade(${c.forwardSign}*Deadband(driver.GetRawAxis(${c.forwardAxis})),${c.turnSign}*Deadband(driver.GetRawAxis(${c.turnAxis})));},[this]{drive.Stop();}));
-    ${p.commands.map(x=>`pathplanner::NamedCommands::registerCommand(${q(x.id)},Action_${x.id}());`).join('\n    ')}
+    ${[...p.commands,...(p.routines||[])].map(x=>`pathplanner::NamedCommands::registerCommand(${q(x.id)},Action_${x.id}());`).join('\n    ')}
     ${p.bindings.map(b=>`frc2::Trigger([this]{return frc::DriverStation::IsTeleopEnabled()&&${b.controller==='driver'?'driver':'operatorController'}.GetRawButton(${b.button});}).${b.behavior==='whileHeld'?'WhileTrue':b.behavior==='onPress'?'OnTrue':'ToggleOnTrue'}(Action_${b.command}());`).join('\n    ')}
     chooser.SetDefaultOption("Do nothing",none.get());
     if(drive.autoReady)try{autoCommand.emplace(pathplanner::PathPlannerAuto(${q(p.auto.name)}).ToPtr().WithTimeout(15_s).FinallyDo([this](bool){StopAll();}));chooser.AddOption(${q(p.auto.name)},autoCommand->get());}catch(const std::exception&e){FRC_ReportError(frc::err::Error, "{}", std::string("Auto failed to load: ")+e.what());}
