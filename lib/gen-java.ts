@@ -1,6 +1,9 @@
+import { javaMotor } from './gen-motors';
+import { javaAction } from './gen-actions';
+import { navxPort } from './gen-devices';
 import type { Project,Motor } from './robot-model';
 const q=JSON.stringify;
-export function javaSources(p:Project):Record<string,string>{const d=p.drive,c=p.controls;const motor=(m:Motor)=>`new MotorIO(${q(m.type)}, ${m.can}, ${m.inverted}, ${m.sensorSign}, ${m.current}, ${m.limit})`;const driveMotors=(side:string)=>p.motors.filter(m=>m.role===side).map(motor).join(', ');const mechanisms=p.subsystems.filter(s=>s.id!=='drive');return {
+export function javaSources(p:Project):Record<string,string>{const d=p.drive,c=p.controls;const motor=(m:Motor)=>`new MotorIO(${q(m.type)}, ${m.can}, ${m.inverted}, ${m.sensorSign}, ${m.current}, ${m.limit}, ${q(m.bus||'rio')}, ${q(m.motorKind||'default')})`;const driveMotors=(side:string)=>p.motors.filter(m=>m.role===side).map(motor).join(', ');const mechanisms=p.subsystems.filter(s=>s.id!=='drive');return {
 'src/main/java/frc/robot/Robot.java':`package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.DataLogManager;
@@ -22,50 +25,7 @@ public class Robot extends TimedRobot {
 import edu.wpi.first.wpilibj.RobotBase;
 public final class Main { private Main() {} public static void main(String... args) { RobotBase.startRobot(Robot::new); } }
 `,
-'src/main/java/frc/robot/MotorIO.java':`package frc.robot;
-import com.revrobotics.*;
-import com.revrobotics.spark.*;
-import com.revrobotics.spark.config.*;
-import com.ctre.phoenix6.hardware.TalonFX;
-import com.ctre.phoenix6.configs.TalonFXConfiguration;
-import com.ctre.phoenix6.signals.*;
-import edu.wpi.first.wpilibj.*;
-import edu.wpi.first.math.MathUtil;
-/** Vendor boundary. Encoder units are motor rotations and rotations/second. */
-public final class MotorIO {
-  private SparkBase spark; private TalonFX talon;
-  private final double sign; private final DigitalInput limit;
-  private boolean configured = false;
-  public MotorIO(String kind, int can, boolean inverted, double encoderSign, int amps, int dio) {
-    sign = encoderSign; limit = dio >= 0 ? new DigitalInput(dio) : null;
-    if (kind.equals("TalonFX")) {
-      talon = new TalonFX(can);
-      var config = new TalonFXConfiguration();
-      config.MotorOutput.Inverted = inverted ? InvertedValue.Clockwise_Positive : InvertedValue.CounterClockwise_Positive;
-      config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
-      config.CurrentLimits.StatorCurrentLimitEnable = true;
-      config.CurrentLimits.StatorCurrentLimit = amps;
-      for (int i=0;i<3&&!configured;i++) configured=talon.getConfigurator().apply(config).isOK();
-    } else {
-      spark = kind.equals("SparkFlex") ? new SparkFlex(can, SparkLowLevel.MotorType.kBrushless) : new SparkMax(can, SparkLowLevel.MotorType.kBrushless);
-      SparkBaseConfig config = kind.equals("SparkFlex") ? new SparkFlexConfig() : new SparkMaxConfig();
-      config.inverted(inverted).idleMode(SparkBaseConfig.IdleMode.kBrake).smartCurrentLimit(amps);
-      for(int i=0;i<3&&!configured;i++) configured=spark.configure(config, ResetMode.kResetSafeParameters, PersistMode.kPersistParameters)==REVLibError.kOk;
-    }
-    if(!configured) DriverStation.reportError("Motor configuration failed, output inhibited: CAN "+can,false);
-  }
-  public double position() { return sign*(spark!=null?spark.getEncoder().getPosition():talon.getPosition().getValueAsDouble()); }
-  public double velocity() { return sign*(spark!=null?spark.getEncoder().getVelocity()/60.0:talon.getVelocity().getValueAsDouble()); }
-  public boolean ready() { return configured; }
-  public void voltage(double volts) {
-    if(!configured || !DriverStation.isEnabled() || !Double.isFinite(volts)) volts=0;
-    if(limit!=null && !limit.get() && volts>0) volts=0;
-    volts=MathUtil.clamp(volts,-12,12);
-    if(spark!=null) spark.setVoltage(volts); else talon.setVoltage(volts);
-  }
-  public void stop() { voltage(0); }
-}
-`,
+'src/main/java/frc/robot/MotorIO.java':javaMotor(p),
 'src/main/java/frc/robot/Mechanism.java':`package frc.robot;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj2.command.*;
@@ -94,7 +54,7 @@ import com.pathplanner.lib.controllers.PPLTVController;
 public final class Drive extends SubsystemBase {
   private final MotorIO[] left={${driveMotors('left')}};
   private final MotorIO[] right={${driveMotors('right')}};
-  private final ${d.gyro==='Pigeon2'?`Pigeon2 gyro=new Pigeon2(${d.gyroCan})`:'ADXRS450_Gyro gyro=new ADXRS450_Gyro()'};
+  private final ${d.gyro==='Pigeon2'?`Pigeon2 gyro=new Pigeon2(${d.gyroCan},new com.ctre.phoenix6.CANBus(${q(d.gyroBus||'rio')}))`:d.gyro==='NavX'?`com.studica.frc.AHRS gyro=new com.studica.frc.AHRS(com.studica.frc.AHRS.NavXComType.${navxPort(d.navxInterface)})`:'ADXRS450_Gyro gyro=new ADXRS450_Gyro()'};
   private final double metersPerRotation=Math.PI*${d.wheelDiameter}/${d.gearing};
   private final DifferentialDriveKinematics kinematics=new DifferentialDriveKinematics(${d.trackWidth});
   private final DifferentialDriveOdometry odometry;
@@ -144,6 +104,7 @@ import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 public final class RobotContainer {
   private final Drive drive=new Drive();
+  private final HardwareIO hardware=new HardwareIO();
   private final GenericHID driver=new GenericHID(${c.driverPort}),operator=new GenericHID(${c.operatorPort});
   ${mechanisms.map(s=>`private final Mechanism mechanism_${s.id}=new Mechanism(${q(s.name)}${p.motors.filter(m=>m.subsystem===s.id).map(m=>', '+motor(m)).join('')});`).join('\n  ')}
   private final SendableChooser<Command> chooser=new SendableChooser<>();
@@ -155,9 +116,9 @@ public final class RobotContainer {
     if(drive.autoReady()) try { chooser.addOption(${q(p.auto.name)},new PathPlannerAuto(${q(p.auto.name)}).withTimeout(15).finallyDo(interrupted->stopAll())); } catch(Exception e) { DriverStation.reportError("Auto failed to load: "+e.getMessage(),false); }
     SmartDashboard.putData("Auto chooser",chooser);
   }
-  ${p.commands.map(x=>`private Command action_${x.id}() { return mechanism_${x.subsystem}.action(${x.output},${x.timeout}).withName(${q(x.name)}); }`).join('\n  ')}
+  ${p.commands.map(javaAction).join('\n  ')}
   public Command autonomous() { return chooser.getSelected(); }
-  public void stopAll() { drive.stop(); ${mechanisms.map(s=>`mechanism_${s.id}.stop();`).join(' ')} }
+  public void stopAll() { drive.stop(); hardware.stopAll(); ${mechanisms.map(s=>`mechanism_${s.id}.stop();`).join(' ')} }
 }
 `};}
 

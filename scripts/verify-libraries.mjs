@@ -17,7 +17,7 @@ for(const change of [m=>m.uuid='00000000-0000-4000-8000-000000000000',m=>m.frcYe
 const lowered = structuredClone(baseline); lowered.wpilib='2026.1.1';
 assert.equal(lib.mergeNewer(baseline,lowered).wpilib,baseline.wpilib);
 const noNetwork = await lib.refreshLibraryCatalog(async()=>{throw Error('Offline test');});
-assert.equal(lib.lockKey(noNetwork.lock),lib.lockKey(baseline)); assert.equal(noNetwork.errors.length,14);
+assert.equal(lib.lockKey(noNetwork.lock),lib.lockKey(baseline)); assert.equal(noNetwork.errors.length,18);
 const asset = async name=>new Uint8Array(await fs.readFile('public'+name));
 for(const language of ['Java','C++','Python']) {
   const p={...structuredClone(lib.initialProject),team:9999,language,libraries:{mode:'frozen',extras:['pwf','navx','photonvision'],lock:baseline}};

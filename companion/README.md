@@ -1,4 +1,4 @@
-# RobotForge Companion 1.1.0
+# RobotForge Companion 1.2.0
 
 This companion lets the RobotForge web app build Java/C++/Python projects locally and deploy them to your FRC roboRIO using GradleRIO or RobotPy. It only accepts validated RobotForge configurations, not arbitrary source uploads or shell commands.
 
@@ -17,7 +17,7 @@ The companion does not control Driver Station or enable the robot. It cannot ind
 
 ## At events / offline
 
-Companion 1.1.0 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
+Companion 1.2.0 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
 
 Complete an online build on this laptop for each language you plan to use before the event. **Use cached dependencies** skips network preparation; it fails if the required dependencies have not been cached. Java/C++ uploads always run Gradle offline. Python uploads use the requirements downloaded by RobotPy sync. Changing connection or configuration requires a new build. Build cancellation is available; upload cancellation is deliberately unavailable because interrupting a transfer may leave the roboRIO in an incomplete state. The 20-minute operation timeout still applies.
 

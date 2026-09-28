@@ -30,7 +30,7 @@ export default function DeployView({ project, blocked }: { project: Project; blo
   }
   async function connect() {
     setWorking(true); setError('');
-    try { const result = await request('/status', undefined, code.trim()); if (result.protocol !== 2) throw Error('Download the latest companion to continue.'); session.token = code.trim(); setJob(result.job); setPaired(true); }
+    try { const result = await request('/status', undefined, code.trim()); if (result.protocol !== 3) throw Error('Download the latest companion to continue.'); session.token = code.trim(); setJob(result.job); setPaired(true); }
     catch (e) { setError((e as Error).message); setPaired(false); }
     finally { setWorking(false); }
   }

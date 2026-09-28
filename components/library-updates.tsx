@@ -4,7 +4,7 @@ import { ArrowUpRight, Download, LockKeyhole, Package, RefreshCw, Undo2 } from '
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import type { Project } from '@/lib/robot-model';
-import { librarySettings } from '@/lib/library-project';
+import { librarySettings,hardwareVendors,projectLibraryLock } from '@/lib/library-project';
 import { vendorIds, vendorRegistry, lockKey, mergeNewer, validateLibraryLock, type LibraryCatalog, type LibrarySettings } from '@/lib/libraries';
 import { download } from '@/lib/zip';
 
@@ -24,7 +24,7 @@ export function useLibraryUpdates(ready: boolean, project: Project, update: (pat
       setCatalog(result); setError('');
       const state = latest.current, settings = librarySettings(state.project);
       if (settings.mode === 'automatic') {
-        const lock = mergeNewer(settings.lock, result.lock);
+        const lock = projectLibraryLock(state.project,mergeNewer(settings.lock, result.lock));
         if (!state.project.libraries || lockKey(lock) !== lockKey(settings.lock)) {
           state.update({ libraries: { ...settings, lock, previous: settings.lock } });
           if (state.project.libraries) toast.info('Stable library updates applied. Build and test before deploying.');
@@ -46,7 +46,7 @@ export function useLibraryUpdates(ready: boolean, project: Project, update: (pat
 export type UpdateStatus = ReturnType<typeof useLibraryUpdates>;
 export default function LibraryUpdates({ project, update, status }: { project: Project; update: (patch: Partial<Project>)=>void; status: UpdateStatus }) {
   const settings = librarySettings(project), { catalog, checking, error, check } = status;
-  const next = catalog ? mergeNewer(settings.lock, catalog.lock) : settings.lock;
+  const next = catalog ? projectLibraryLock(project,mergeNewer(settings.lock, catalog.lock)) : settings.lock;
   const available = lockKey(next) !== lockKey(settings.lock);
   const change = (patch: Partial<LibrarySettings>) => update({ libraries: { ...settings, ...patch } });
   return <div className="view-stack library-view"><div className="page-heading"><div><div className="eyebrow">LIBRARIES & UPDATES</div><h1>Keep your robot’s tools current.</h1><p>Official releases, exact versions, and a competition freeze when you need it.</p></div></div>
@@ -57,7 +57,7 @@ export default function LibraryUpdates({ project, update, status }: { project: P
       {(error || !!catalog?.errors.length) && <div className="issue warning" role="status"><div><b>Some update checks could not finish.</b><p>{error || 'Saved versions are retained for unavailable feeds. No dependency is downgraded.'}</p>{!!catalog?.errors.length && <details><summary>Show feed details</summary>{catalog.errors.map(e=><p key={e}>{e}</p>)}</details>}</div></div>}
     </section>
     <section className="panel"><div className="panel-title"><div><h2>Core FIRST tools</h2><p>Stable releases only. New-season releases and previews are excluded.</p></div><span className="tag">2026</span></div><div className="library-core"><div><b>WPILib / GradleRIO</b><span>{settings.lock.wpilib}</span><a href="https://github.com/wpilibsuite/allwpilib/releases" target="_blank" rel="noreferrer">Release notes <ArrowUpRight size={13}/></a></div><div><b>RobotPy</b><span>{settings.lock.robotpy}</span><a href="https://github.com/robotpy/robotpy/releases" target="_blank" rel="noreferrer">Release notes <ArrowUpRight size={13}/></a></div></div></section>
-    <section className="panel"><div className="panel-title"><div><h2>Vendor libraries</h2><p>Java and C++ receive vendordep files. Python receives the matching pinned package.</p></div><Package size={23}/></div><div className="vendor-list">{vendorIds.map(id=>{const def=vendorRegistry[id], enabled=def.required || settings.extras.includes(id), release=settings.lock.vendors[id];return <div className="vendor-item" key={id}><div className="vendor-description"><h3>{def.name}{def.required && <span className="tag">Generator dependency</span>}</h3><p>{def.description}</p><a href={def.docs} target="_blank" rel="noreferrer">API documentation <ArrowUpRight size={13}/></a></div><div className="vendor-versions"><span>Java / C++ <b>{release.manifest.version}</b></span><span>Python <b>{release.python}</b></span></div><Switch aria-label={`Include ${def.name}`} checked={enabled} disabled={def.required} onCheckedChange={on=>change({extras:on?[...settings.extras,id]:settings.extras.filter(v=>v!==id)})}/></div>;})}</div></section>
-    <div className="info-note">Adding a library installs its APIs in the generated project. Device-specific logic for PWF sensors, navX, and PhotonVision still needs to be written in the exported code; the robot editor currently generates its existing motor and drivetrain integrations. A library update does not automatically rewrite code for breaking API changes. The companion blocks deployment if the updated project fails to build.</div>
+    <section className="panel"><div className="panel-title"><div><h2>Vendor libraries</h2><p>Java and C++ receive vendordep files. Python receives the matching pinned package.</p></div><Package size={23}/></div><div className="vendor-list">{vendorIds.map(id=>{const def=vendorRegistry[id], required=def.required||hardwareVendors(project).includes(id), enabled=required || settings.extras.includes(id), release=settings.lock.vendors[id];return <div className="vendor-item" key={id}><div className="vendor-description"><h3>{def.name}{required && <span className="tag">Generator dependency</span>}</h3><p>{def.description}</p><a href={def.docs} target="_blank" rel="noreferrer">API documentation <ArrowUpRight size={13}/></a></div><div className="vendor-versions"><span>{id==='thrifty'?'Java only':'Java / C++'} <b>{release.manifest.version}</b></span><span>Python <b>{release.python||'Not provided'}</b></span></div><Switch aria-label={`Include ${def.name}`} checked={enabled} disabled={required} onCheckedChange={on=>change({extras:on?[...settings.extras,id]:settings.extras.filter(v=>v!==id)})}/></div>;})}</div></section>
+    {project.language==='Python'&&settings.extras.includes('phoenix5')&&<div className="info-note">Legacy CTRE Python devices require Phoenix 6 {settings.lock.legacyPhoenix6}. This compatible version is pinned automatically alongside robotpy-ctre.</div>}<div className="info-note">Adding a library installs its APIs in the generated project. Hardware profiles describe the generated adapters. Adding a device automatically selects its library. PhotonVision pose fusion and devices labeled Integration needed require custom code. A library update does not automatically rewrite code for breaking API changes. The companion blocks deployment if the updated project fails to build.</div>
   </div>;
 }

@@ -6,12 +6,12 @@ import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { projectSchema, validate } from '../lib/robot-model.ts';
 import { assembleProject } from '../lib/generator.ts';
-import { librarySettings } from '../lib/library-project.ts';
+import { librarySettings,projectLibraryLock } from '../lib/library-project.ts';
 import { getLibraryCatalog } from '../lib/library-service.ts';
 import { mergeNewer, pythonRequirements, selectedVendors, vendorRegistry } from '../lib/libraries.ts';
 
 export const PORT = 5819;
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 export const SITE = 'https://robot-forge-frc.paul-seed121071.chatgpt.site';
 const digest = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -73,7 +73,7 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
         if (settings.mode === 'automatic' && !current.offline) {
           log('Checking stable 2026 library releases…\n');
           const available = await catalog();
-          lock = mergeNewer(lock, available.lock);
+          lock = projectLibraryLock(current.project,mergeNewer(lock, available.lock));
           for (const warning of available.errors) log(`Update check: ${warning}\n`);
         }
         current.settings = { ...settings, lock };
@@ -153,7 +153,7 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
       const supplied = Buffer.from(req.headers.authorization || '');
       const expected = Buffer.from(`Bearer ${token}`);
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) fail('Pairing code is incorrect. Copy the code shown by your companion.', 401);
-      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: '1.1.0', job: publicJob() });
+      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: '1.2.0', job: publicJob() });
       if (req.method !== 'POST') fail('Not found.', 404);
       const data = await body(req);
       if (req.url === '/build') {

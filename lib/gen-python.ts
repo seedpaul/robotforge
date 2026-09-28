@@ -1,7 +1,10 @@
+import { pythonMotor } from './gen-motors';
+import { navxPort } from './gen-devices';
 import type { Project } from './robot-model';
 import { pythonProjectFile } from './library-project';
 export function pythonSources(p:Project):Record<string,string>{return {
-'robot.py':`import commands2
+'robot.py':`import math
+import commands2
 import wpilib
 from wpimath import applyDeadband
 from commands2.button import Trigger
@@ -9,12 +12,14 @@ from pathplannerlib.auto import NamedCommands, PathPlannerAuto
 from config import CONFIG
 from hardware import MotorIO, Mechanism
 from drive import Drive
+from peripherals import HardwareIO
 
 class Robot(wpilib.TimedRobot):
     def robotInit(self):
         wpilib.DataLogManager.start()
         wpilib.DriverStation.startDataLog(wpilib.DataLogManager.getLog())
         self.drive = Drive()
+        self.hardware = HardwareIO()
         self.driver = wpilib.Joystick(CONFIG['controls']['driverPort'])
         self.operator = wpilib.Joystick(CONFIG['controls']['operatorPort'])
         self.mechanisms = {s['id']: Mechanism(s['name'], [MotorIO(m) for m in CONFIG['motors'] if m['subsystem'] == s['id']]) for s in CONFIG['subsystems'] if s['id'] != 'drive'}
@@ -40,7 +45,19 @@ class Robot(wpilib.TimedRobot):
 
     def action(self, command_id):
         c = next(c for c in CONFIG['commands'] if c['id'] == command_id)
-        return self.mechanisms[c['subsystem']].action(c['output'], c['timeout']).withName(c['name'])
+        owner = self.mechanisms[c['subsystem']]
+        stop = getattr(self.hardware, 'stop_' + c['device']) if c.get('device') else owner.stop
+        setter = getattr(self.hardware, 'set_' + c['device']) if c.get('device') else owner.set
+        def should_stop():
+            if not c.get('untilDevice'): return False
+            value = getattr(self.hardware, 'read_' + c['untilDevice'])()
+            return not math.isfinite(value) or (value <= c.get('threshold', 0.5) if c.get('condition') == 'below' else value >= c.get('threshold', 0.5))
+        def execute():
+            if should_stop(): stop()
+            else: setter(c['output'])
+        command = owner.runEnd(execute, stop).withTimeout(c['timeout'])
+        if c.get('untilDevice'): command = command.until(should_stop)
+        return command.withName(c['name'])
 
     def teleop_drive(self):
         c = CONFIG['controls']
@@ -69,6 +86,7 @@ class Robot(wpilib.TimedRobot):
         self.stop_all()
 
     def stop_all(self):
+        self.hardware.stop_all()
         self.drive.stop()
         for mechanism in self.mechanisms.values():
             mechanism.stop()
@@ -83,55 +101,7 @@ from phoenix6.configs import TalonFXConfiguration
 from phoenix6.controls import VoltageOut
 from phoenix6.signals import InvertedValue, NeutralModeValue
 
-class MotorIO:
-    def __init__(self, config):
-        self.sign = config['sensorSign']
-        self.limit = wpilib.DigitalInput(config['limit']) if config['limit'] >= 0 else None
-        self.spark = config['type'] != 'TalonFX'
-        self.configured = False
-        if self.spark:
-            self.motor = (rev.SparkFlex if config['type'] == 'SparkFlex' else rev.SparkMax)(config['can'], rev.SparkLowLevel.MotorType.kBrushless)
-            settings = rev.SparkFlexConfig() if config['type'] == 'SparkFlex' else rev.SparkMaxConfig()
-            settings.inverted(config['inverted']).setIdleMode(rev.SparkBaseConfig.IdleMode.kBrake).smartCurrentLimit(config['current'])
-            for _ in range(3):
-                self.configured = self.motor.configure(settings, rev.ResetMode.kResetSafeParameters, rev.PersistMode.kPersistParameters) == rev.REVLibError.kOk
-                if self.configured:
-                    break
-            self.encoder = self.motor.getEncoder()
-        else:
-            self.motor = TalonFX(config['can'])
-            settings = TalonFXConfiguration()
-            settings.motor_output.inverted = InvertedValue.CLOCKWISE_POSITIVE if config['inverted'] else InvertedValue.COUNTER_CLOCKWISE_POSITIVE
-            settings.motor_output.neutral_mode = NeutralModeValue.BRAKE
-            settings.current_limits.stator_current_limit_enable = True
-            settings.current_limits.stator_current_limit = config['current']
-            for _ in range(3):
-                self.configured = self.motor.configurator.apply(settings).is_ok()
-                if self.configured:
-                    break
-        if not self.configured:
-            wpilib.reportError('Motor configuration failed, output inhibited: CAN ' + str(config['can']))
-
-    def position(self):
-        return self.sign * (self.encoder.getPosition() if self.spark else self.motor.get_position().value_as_double)
-
-    def velocity(self):
-        return self.sign * (self.encoder.getVelocity() / 60.0 if self.spark else self.motor.get_velocity().value_as_double)
-
-    def voltage(self, volts):
-        if not self.configured or not wpilib.DriverStation.isEnabled() or not math.isfinite(volts):
-            volts = 0.0
-        if self.limit is not None and not self.limit.get() and volts > 0:
-            volts = 0.0
-        volts = max(-12.0, min(12.0, volts))
-        if self.spark:
-            self.motor.setVoltage(volts)
-        else:
-            self.motor.set_control(VoltageOut(volts))
-
-    def stop(self):
-        self.voltage(0)
-
+${pythonMotor(p)}
 class Mechanism(commands2.Subsystem):
     def __init__(self, name, motors):
         super().__init__()
@@ -160,7 +130,9 @@ import commands2
 import wpilib
 from wpimath.kinematics import DifferentialDriveKinematics, DifferentialDriveOdometry, DifferentialDriveWheelSpeeds
 from wpimath.controller import PIDController
+from phoenix6 import CANBus
 from phoenix6.hardware import Pigeon2
+${p.drive.gyro==='NavX'?'import navx':''}
 from pathplannerlib.auto import AutoBuilder
 from pathplannerlib.config import RobotConfig
 from pathplannerlib.controller import PPLTVController
@@ -173,7 +145,7 @@ class Drive(commands2.Subsystem):
         self.d = CONFIG['drive']
         self.left = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'left']
         self.right = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'right']
-        self.gyro = Pigeon2(self.d['gyroCan']) if self.d['gyro'] == 'Pigeon2' else wpilib.ADXRS450_Gyro()
+        self.gyro = Pigeon2(self.d['gyroCan'], CANBus(self.d.get('gyroBus','rio'))) if self.d['gyro'] == 'Pigeon2' else ${p.drive.gyro==='NavX'?`navx.AHRS(navx.AHRS.NavXComType.${navxPort(p.drive.navxInterface)})`:'wpilib.ADXRS450_Gyro()'}
         if self.d['gyro'] == 'ADXRS450' and wpilib.RobotBase.isReal():
             self.gyro.calibrate()
         self.meters_per_rotation = math.pi * self.d['wheelDiameter'] / self.d['gearing']

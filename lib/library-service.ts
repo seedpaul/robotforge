@@ -1,4 +1,4 @@
-import { SEASON, vendorRegistry, vendorIds, validateManifest, compareVersions, isSeasonVersion, validateLibraryLock, type LibraryCatalog, type VendorId } from './libraries';
+import { SEASON, vendorRegistry, vendorIds, validateManifest, compareVersions, isSeasonVersion, isVendorVersion, validateLibraryLock, type LibraryCatalog, type VendorId } from './libraries';
 import { bundledLock } from './library-project';
 
 type Fetcher = typeof fetch;
@@ -28,7 +28,7 @@ export function latestPython(data: unknown, short = false) {
 export function registryFile(index: unknown, id: VendorId) {
   if (!Array.isArray(index)) throw Error('Invalid WPILib vendor index');
   const prefix = vendorRegistry[id].prefix;
-  const names = index.map(f => f.name).filter((name: unknown): name is string => typeof name === 'string' && name.startsWith(prefix) && name.endsWith('.json') && isSeasonVersion(name.slice(prefix.length, -5), id === 'ctre'));
+  const names = index.map(f => f.name).filter((name: unknown): name is string => typeof name === 'string' && name.startsWith(prefix) && name.endsWith('.json') && isVendorVersion(id,name.slice(prefix.length, -5)));
   names.sort((a, b) => compareVersions(a.slice(prefix.length, -5), b.slice(prefix.length, -5)));
   if (!names.length) throw Error('No stable vendor release for this season'); return names.at(-1)!;
 }
@@ -54,9 +54,19 @@ export async function refreshLibraryCatalog(fetcher: Fetcher = fetch): Promise<L
         if (!data) { const listing = await index; if ('error' in listing) throw listing.error; data = await json(RAW + registryFile(listing.value, id), fetcher); }
         result.lock.vendors[id].manifest = validateManifest(id, data);
       }),
-      task(vendorRegistry[id].python, async () => { result.lock.vendors[id].python = latestPython(await json(`https://pypi.org/pypi/${vendorRegistry[id].python}/json`, fetcher), id === 'ctre'); }),
+      ...(id === 'thrifty' ? [] : [task(vendorRegistry[id].python, async () => { result.lock.vendors[id].python = latestPython(await json(`https://pypi.org/pypi/${vendorRegistry[id].python}/json`, fetcher), id === 'ctre'); })]),
     ]),
   ]);
+  await task('Legacy CTRE Python compatibility',async()=>{
+    const meta=await json('https://pypi.org/pypi/robotpy-ctre/'+result.lock.vendors.phoenix5.python+'/json',fetcher) as {info:{requires_dist:string[]}};
+    const requirement=meta.info.requires_dist.find(v=>v.toLowerCase().startsWith('phoenix6'))||'';
+    const match=requirement.match(/^phoenix6\s*~=\s*(26\.\d+)\.(\d+)$/i);
+    if(!match)throw Error('Unrecognized Phoenix 6 constraint; retaining verified legacy package pair');
+    const phoenix=await json('https://pypi.org/pypi/phoenix6/json',fetcher) as {releases:Record<string,{yanked?:boolean}[]>};
+    const candidates=Object.keys(phoenix.releases).filter(v=>isSeasonVersion(v,true)&&v.startsWith(match[1]+'.')&&compareVersions(v,match[1]+'.'+match[2])>=0&&phoenix.releases[v].some(f=>!f.yanked)).sort(compareVersions);
+    if(!candidates.length)throw Error('No compatible stable Phoenix 6 Python release');result.lock.legacyPhoenix6=candidates.at(-1)!;
+  });
+  if(result.sources['Legacy CTRE Python compatibility']==='bundled'){result.lock.vendors.phoenix5.python=bundledLock.vendors.phoenix5.python;result.lock.legacyPhoenix6=bundledLock.legacyPhoenix6;}
   result.lock.checkedAt = checkedAt;
   validateLibraryLock(result.lock);
   return result;

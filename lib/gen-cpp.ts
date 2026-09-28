@@ -1,6 +1,11 @@
+import { cppMotor } from './gen-motors';
+import { cppAction } from './gen-actions';
+import { navxPort } from './gen-devices';
 import type { Project,Motor } from './robot-model';
 const q=JSON.stringify;
-export function cppSources(p:Project):Record<string,string>{const d=p.drive,c=p.controls;const motor=(m:Motor)=>`std::make_shared<MotorIO>(${q(m.type)},${m.can},${m.inverted},${m.sensorSign},${m.current},${m.limit})`;const side=(role:string)=>p.motors.filter(m=>m.role===role).map(motor).join(',');const mechanisms=p.subsystems.filter(s=>s.id!=='drive');return {'src/main/cpp/Robot.cpp':`#include <algorithm>
+export function cppSources(p:Project):Record<string,string>{const d=p.drive,c=p.controls;const motor=(m:Motor)=>`std::make_shared<MotorIO>(${q(m.type)},${m.can},${m.inverted},${m.sensorSign},${m.current},${m.limit},${q(m.bus||'rio')},${q(m.motorKind||'default')})`;const side=(role:string)=>p.motors.filter(m=>m.role===role).map(motor).join(',');const mechanisms=p.subsystems.filter(s=>s.id!=='drive');return {'src/main/cpp/Robot.cpp':`#include "HardwareIO.h"
+${d.gyro==='NavX'?'#include <studica/AHRS.h>':''}
+#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <optional>
@@ -39,47 +44,7 @@ export function cppSources(p:Project):Record<string,string>{const d=p.drive,c=p.
 #include <pathplanner/lib/controllers/PPLTVController.h>
 using namespace units::literals;
 
-class MotorIO {
-  std::unique_ptr<rev::spark::SparkBase> spark;
-  std::unique_ptr<ctre::phoenix6::hardware::TalonFX> talon;
-  std::unique_ptr<frc::DigitalInput> limit;
-  double sign;
-  bool configured=false;
-public:
-  MotorIO(std::string kind,int can,bool inverted,double encoderSign,int amps,int dio):sign(encoderSign) {
-    if(dio>=0) limit=std::make_unique<frc::DigitalInput>(dio);
-    if(kind=="TalonFX") {
-      talon=std::make_unique<ctre::phoenix6::hardware::TalonFX>(can);
-      ctre::phoenix6::configs::TalonFXConfiguration config;
-      config.MotorOutput.Inverted=inverted?ctre::phoenix6::signals::InvertedValue::Clockwise_Positive:ctre::phoenix6::signals::InvertedValue::CounterClockwise_Positive;
-      config.MotorOutput.NeutralMode=ctre::phoenix6::signals::NeutralModeValue::Brake;
-      config.CurrentLimits.StatorCurrentLimitEnable=true;
-      config.CurrentLimits.StatorCurrentLimit=units::ampere_t{static_cast<double>(amps)};
-      for(int i=0;i<3&&!configured;i++) configured=talon->GetConfigurator().Apply(config).IsOK();
-    } else {
-      if(kind=="SparkFlex") {
-        spark=std::make_unique<rev::spark::SparkFlex>(can,rev::spark::SparkLowLevel::MotorType::kBrushless);
-        rev::spark::SparkFlexConfig config;config.Inverted(inverted).SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kBrake).SmartCurrentLimit(amps);
-        for(int i=0;i<3&&!configured;i++) configured=spark->Configure(config,rev::ResetMode::kResetSafeParameters,rev::PersistMode::kPersistParameters)==rev::REVLibError::kOk;
-      } else {
-        spark=std::make_unique<rev::spark::SparkMax>(can,rev::spark::SparkLowLevel::MotorType::kBrushless);
-        rev::spark::SparkMaxConfig config;config.Inverted(inverted).SetIdleMode(rev::spark::SparkBaseConfig::IdleMode::kBrake).SmartCurrentLimit(amps);
-        for(int i=0;i<3&&!configured;i++) configured=spark->Configure(config,rev::ResetMode::kResetSafeParameters,rev::PersistMode::kPersistParameters)==rev::REVLibError::kOk;
-      }
-    }
-    if(!configured) FRC_ReportError(frc::err::Error, "{}", "Motor configuration failed; output inhibited at CAN "+std::to_string(can));
-  }
-  bool Ready() { return configured; }
-  double Position() { return sign*(spark?spark->GetEncoder().GetPosition():talon->GetPosition().GetValueAsDouble()); }
-  double Velocity() { return sign*(spark?spark->GetEncoder().GetVelocity()/60.0:talon->GetVelocity().GetValueAsDouble()); }
-  void Voltage(double value) {
-    if(!configured||!frc::DriverStation::IsEnabled()||!std::isfinite(value))value=0;
-    if(limit&&!limit->Get()&&value>0)value=0;
-    auto volts=units::volt_t{std::clamp(value,-12.0,12.0)};
-    if(spark)spark->SetVoltage(volts);else talon->SetVoltage(volts);
-  }
-  void Stop(){Voltage(0);}
-};
+${cppMotor(p)}
 using Motors=std::vector<std::shared_ptr<MotorIO>>;
 class Mechanism:public frc2::SubsystemBase {
   Motors motors; double last=0;
@@ -92,7 +57,7 @@ public:
 };
 class Drive:public frc2::SubsystemBase {
   Motors left{${side('left')}},right{${side('right')}};
-  ${d.gyro==='Pigeon2'?`ctre::phoenix6::hardware::Pigeon2 gyro{${d.gyroCan}};`:'frc::ADXRS450_Gyro gyro;'}
+  ${d.gyro==='Pigeon2'?`ctre::phoenix6::hardware::Pigeon2 gyro{${d.gyroCan},ctre::phoenix6::CANBus{${q(d.gyroBus||'rio')}}};`:d.gyro==='NavX'?`studica::AHRS gyro{studica::AHRS::NavXComType::${navxPort(d.navxInterface)}};`:'frc::ADXRS450_Gyro gyro;'}
   double conversion=3.141592653589793*${d.wheelDiameter}/${d.gearing};
   frc::DifferentialDriveKinematics kinematics{units::meter_t{${d.trackWidth}}};
   frc::DifferentialDriveOdometry odometry{gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)}};
@@ -120,6 +85,7 @@ public:
 };
 class Robot:public frc::TimedRobot {
   Drive drive;
+  HardwareIO hardware;
   frc::GenericHID driver{${c.driverPort}},operatorController{${c.operatorPort}};
   ${mechanisms.map(s=>`Mechanism mechanism_${s.id}{${q(s.name)},Motors{${p.motors.filter(m=>m.subsystem===s.id).map(motor).join(',')}}};`).join('\n  ')}
   frc::SendableChooser<frc2::Command*> chooser;
@@ -127,8 +93,8 @@ class Robot:public frc::TimedRobot {
   std::optional<frc2::CommandPtr> autoCommand;
   frc2::Command* selected=nullptr;
   double Deadband(double value){return std::abs(value)<=${c.deadband}?0:std::copysign((std::abs(value)-${c.deadband})/(1-${c.deadband}),value);}
-  ${p.commands.map(x=>`frc2::CommandPtr Action_${x.id}(){return mechanism_${x.subsystem}.Action(${x.output},${x.timeout}).WithName(${q(x.name)});}`).join('\n  ')}
-  void StopAll(){drive.Stop();${mechanisms.map(s=>`mechanism_${s.id}.Stop();`).join('')}}
+  ${p.commands.map(cppAction).join('\n  ')}
+  void StopAll(){drive.Stop();hardware.StopAll();${mechanisms.map(s=>`mechanism_${s.id}.Stop();`).join('')}}
 public:
   void RobotInit() override {
     frc::DataLogManager::Start();frc::DriverStation::StartDataLog(frc::DataLogManager::GetLog());
