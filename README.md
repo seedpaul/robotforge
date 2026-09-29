@@ -6,6 +6,8 @@ A device-local FRC robot project builder for the 2026 season. Java, C++, and Pyt
 
 Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 
+For the GitHub Pages build and publication steps, see [GitHub Pages hosting](GITHUB-PAGES.md). `npm run build:pages` creates a static editor and a checked library catalog; publication is gated until public access is approved. Browser projects must be backed up and imported when changing website addresses.
+
 ## Features
 
 - Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF, including all 12 supported CAN/PWM motor-controller profiles

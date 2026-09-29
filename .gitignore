@@ -46,3 +46,7 @@ next-env.d.ts
 /work/
 .verification/
 *.tsbuildinfo
+
+# GitHub Pages output and generated catalog
+/dist-pages/
+/.pages-runtime/

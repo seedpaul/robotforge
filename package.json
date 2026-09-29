@@ -20,7 +20,11 @@
     "test:development": "node scripts/verify-development.mjs",
     "test:drivetrains": "node scripts/verify-drivetrains.mjs",
     "test:wizard": "node scripts/verify-wizard.mjs",
-    "test:designer": "node scripts/verify-designer.mjs"
+    "test:designer": "node scripts/verify-designer.mjs",
+    "prebuild:pages": "node scripts/package-companion.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
+    "preview:pages": "vite preview --config vite.pages.config.ts",
+    "test:pages": "node scripts/verify-pages.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

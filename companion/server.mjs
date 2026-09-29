@@ -12,7 +12,9 @@ import { mergeNewer, pythonRequirements, selectedVendors, vendorRegistry } from 
 
 export const PORT = 5819;
 export const PROTOCOL = 5;
+export const VERSION = '1.4.1';
 export const SITE = 'https://robot-forge-frc.paul-seed121071.chatgpt.site';
+export const PAGES_SITE = 'https://seedpaul.github.io/robotforge/';
 const digest = value => createHash('sha256').update(value).digest('hex');
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 export const targetFor = (team, connection) => connection === 'usb' ? '172.22.11.2' : `roborio-${team}-FRC.local`;
@@ -51,7 +53,7 @@ export async function findJava() {
   return 'java';
 }
 
-export function createCompanion({ assets, root = path.join(os.homedir(), '.robotforge'), run = runProcess, catalog = getLibraryCatalog, token = randomBytes(24).toString('hex'), origins = [SITE], port = PORT }) {
+export function createCompanion({ assets, root = path.join(os.homedir(), '.robotforge'), run = runProcess, catalog = getLibraryCatalog, token = randomBytes(24).toString('hex'), origins = [new URL(SITE).origin, new URL(PAGES_SITE).origin], port = PORT }) {
   const allowed = new Set(origins);
   let job = null, busy = false, lastStart = 0;
   const log = value => { if (job) job.log = (job.log + value.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')).slice(-80000); };
@@ -153,7 +155,7 @@ export function createCompanion({ assets, root = path.join(os.homedir(), '.robot
       const supplied = Buffer.from(req.headers.authorization || '');
       const expected = Buffer.from(`Bearer ${token}`);
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) fail('Pairing code is incorrect. Copy the code shown by your companion.', 401);
-      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: '1.4.0', job: publicJob() });
+      if (req.method === 'GET' && req.url === '/status') return send(200, { protocol: PROTOCOL, version: VERSION, job: publicJob() });
       if (req.method !== 'POST') fail('Not found.', 404);
       const data = await body(req);
       if (req.url === '/build') {
