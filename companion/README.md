@@ -1,4 +1,4 @@
-# RobotForge Companion 1.3.1
+# RobotForge Companion 1.4.1
 
 This companion lets the RobotForge web app build Java/C++/Python projects locally and deploy them to your FRC roboRIO using GradleRIO or RobotPy. It only accepts validated RobotForge configurations, not arbitrary source uploads or shell commands.
 
@@ -8,7 +8,7 @@ This companion lets the RobotForge web app build Java/C++/Python projects locall
 2. Java/C++: install WPILib 2026.2.1 with its JDK and roboRIO C++ toolchain: https://docs.wpilib.org/en/stable/docs/zero-to-robot/step-2/wpilib-setup.html
    Python: install Python 3.12 from https://www.python.org/downloads/. On Windows, include the Python launcher. The first online build installs pinned RobotPy packages into an isolated environment under your home folder's `.robotforge` directory.
 3. Extract this entire ZIP into a folder. Windows: open **Start RobotForge.cmd**. macOS/Linux: open a terminal in this folder and run `node companion.mjs`.
-4. On the SAME laptop, open RobotForge in Chrome or Edge. This version allows the existing https://robot-forge-frc.paul-seed121071.chatgpt.site origin and the proposed GitHub Pages origin https://seedpaul.github.io (app path /robotforge/). In **Code & export > Deploy to robot**, enter the pairing code printed in the companion window. Allow local network access if the browser asks.
+4. On the SAME laptop, open https://robot-forge-frc.paul-seed121071.chatgpt.site or https://seedpaul.github.io/robotforge/ in Chrome or Edge. In **Code & export > Deploy to robot**, enter the pairing code printed in the companion window. Allow local network access if the browser asks.
 5. Enter your real team number and complete your robot configuration. Choose robot network (team mDNS hostname) or USB (172.22.11.2). Click **Build** while online. The first build may take several minutes and downloads build dependencies. No code is sent to a robot at this stage.
 6. Join your robot network or connect USB. Leave the robot disabled. **Review & deploy**, verify the target, type your team number, and confirm the robot is disabled. Deployment replaces the running robot program and generated path files and restarts the program.
 7. Keep power on and keep this companion open until deployment finishes. Check Driver Station and robot logs before enabling. A successful upload does not establish that wiring, direction, sensors, tuning, or paths are correct.
@@ -17,7 +17,7 @@ The companion does not control Driver Station or enable the robot. It cannot ind
 
 ## At events / offline
 
-Companion 1.3.1 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
+Companion 1.4.1 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
 
 Complete an online build on this laptop for each language you plan to use before the event. **Use cached dependencies** skips network preparation; it fails if the required dependencies have not been cached. Java/C++ uploads always run Gradle offline. Python uploads use the requirements downloaded by RobotPy sync. Changing connection or configuration requires a new build. Build cancellation is available; upload cancellation is deliberately unavailable because interrupting a transfer may leave the roboRIO in an incomplete state. The 20-minute operation timeout still applies.
 
@@ -47,4 +47,6 @@ Builds remain in `~/.robotforge/builds` for review; the companion does not delet
 
 The application and companion are software-tested, including generator output and build behavior. Physical roboRIO upload and browser/OS combinations still require on-hardware acceptance testing. There is no claim of automatic competition readiness.
 
-GitHub Pages shares an origin across the account’s project sites. Only run trusted sites on that account. Pairing still requires the current code and every deployment requires explicit confirmation; no wildcard origins are allowed.
+Companion 1.4.1 adds differential/West Coast/tank, mecanum, and four-module swerve generation. Download this release before using the new drivetrain settings. The browser requires protocol 5 so older companions cannot silently generate a different drive layout.
+
+GitHub Pages shares an origin across the accountâ€™s project sites. Only run trusted sites on that account. Pairing still requires the current code and every deployment requires explicit confirmation; no wildcard origins are allowed.

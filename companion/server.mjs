@@ -11,8 +11,8 @@ import { getLibraryCatalog } from '../lib/library-service.ts';
 import { mergeNewer, pythonRequirements, selectedVendors, vendorRegistry } from '../lib/libraries.ts';
 
 export const PORT = 5819;
-export const PROTOCOL = 4;
-export const VERSION = '1.3.1';
+export const PROTOCOL = 5;
+export const VERSION = '1.4.1';
 export const SITE = 'https://robot-forge-frc.paul-seed121071.chatgpt.site';
 export const PAGES_SITE = 'https://seedpaul.github.io/robotforge/';
 const digest = value => createHash('sha256').update(value).digest('hex');

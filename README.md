@@ -10,9 +10,9 @@ For the GitHub Pages build and publication steps, see [GitHub Pages hosting](GIT
 
 ## Features
 
-- Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF
+- Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF, including all 12 supported CAN/PWM motor-controller profiles
 - CAN and PWM motor controllers, named CANivore buses, validated I/O allocation, automatic vendor dependencies, and wiring inventory
-- Differential drivetrain with two motors per side, integrated encoders, ADXRS450, Pigeon 2, or navX gyro
+- Differential, West Coast, tank, mecanum, and four-module swerve drivetrains, integrated drive encoders, ADXRS450, Pigeon 2, or navX gyro
 - Mechanism subsystems, bounded motor / servo / pneumatic / LED commands, sensor stop conditions, and active-low forward DIO limits
 - Mechanism map linking devices to commands and their uses; a guided build order with actionable configuration findings
 - Visual routines with action/wait blocks, sequence and parallel/race/deadline composition, live Java/C++/Python factories, undo, and controller/autonomous reuse
@@ -24,6 +24,34 @@ For the GitHub Pages build and publication steps, see [GitHub Pages hosting](GIT
 - Paired local companion with build logs, cached/offline builds, and explicit team-confirmed deployment to a roboRIO using GradleRIO or RobotPy
 
 Robot projects use pinned WPILib/GradleRIO 2026.2.1, RobotPy 2026.2.2, REVLib 2026.0.5 (Python binding 2026.0.4), Phoenix 6 26.3.0, and PathPlannerLib 2026.1.2. Versions were checked against upstream metadata on 2026-09-28.
+
+## Build with the wizard
+
+RobotForge opens in **Build wizard**.
+
+1. **Plan your robot:** enter the team number and project name, choose Java/C++/Python and a drivetrain, then define the subsystems.
+2. **Add the hardware:** select a subsystem and add its motor controllers, sensors, and other components. New components belong to the selected subsystem; addressing still checks the whole robot. Configure drivetrain feedback and wheel/module assignments here.
+3. **Give it commands:** define bounded actions and optional sensor stops for each mechanism. Configure the default driver command for the drivetrain. Sensor-only and passive subsystems do not require artificial output commands. Continue to button assignments, autonomous, and preflight.
+
+The robot schematic highlights configured subsystems and lists what still needs work. Progress is derived from the current design, including shared-port conflicts; adding a subsystem or breaking an assignment updates it immediately. Green indicates configuration, not successful compilation or physical commissioning. The wizard remembers its step and selected subsystem on this device. Existing backups, checkpoints, and the detailed editors use the same project data. Fresh projects start without example motors or commands, and incomplete drafts can be saved before hardware is added.
+
+### Visual chassis builder
+
+The wizard's first step includes a draggable parts tray. Choose swerve, differential, West Coast, tank, or mecanum drive; add turret, shooter, indexer, intake, arm, elevator, climber, and custom mechanisms. Changing the drivetrain preserves existing hardware and commands for reassignment. Each mechanism gets a unique subsystem and can be moved around the chassis without changing its code or commissioning confirmations.
+
+Click a placed icon to open **About → Motors → Sensors & devices → Commands → Review**. The drivetrain has dedicated geometry, module-assignment, and driver-control steps. Each editor works on that subsystem while checking conflicts across the whole robot. Color reflects the current configuration, including changes made in the detailed editors.
+
+On touch screens, select a part and tap the chassis. Keyboard users can select a template, focus the chassis, and press Enter to place it; arrow keys move a focused mechanism and Enter opens its setup. Named subsystem buttons beneath the canvas remain accessible when icons overlap. Positions and icon choices survive project backups and development checkpoints; older projects receive a default layout.
+
+The chassis is a visual organizer. Icon positions do not set robot geometry or offsets. Turret, arm, elevator, and climber templates organize hardware and bounded output commands; closed-loop angle/position control still requires additional robot code.
+
+`npm run test:designer` verifies layout persistence, legacy compatibility, placement bounds, incremental additions, drivetrain replacement, preserved assignments, completion changes, and generated-code stability when moving icons.
+
+`npm run test:wizard` verifies draft persistence, subsystem ownership, cross-subsystem collision handling, iterative additions, completion changes, and checkpoint compatibility.
+
+## Configure motor controllers
+
+In **Hardware → Component library**, choose **Motor controllers** or search for SPARK MAX, SPARK Flex, Talon FX/FXS/SRX, Victor SPX/SP, or Thrifty Nova. **Add** creates that controller in the motor configuration and takes you to its name, CAN ID/PWM channel, subsystem, motor model, and limits. Suggested addresses account for other motors, sensors, the drivetrain gyro, servos, and LED outputs. Thrifty Nova is marked Java-only. The catalog and controller selector share the same profiles; existing saved projects keep their original motor configuration.
 
 ## Deploy from the browser
 
@@ -53,7 +81,7 @@ The companion was exercised on Windows with a real Java build and native depende
 
 ## Scope and limitations
 
-This is an initial functional generator for differential-drive robots. It is not an automatic competition-readiness certification. Swerve, vision fusion, devices without an implemented profile, bidirectional position-limited mechanisms, mechanism PID/profiled setpoints, multi-path libraries, event markers, obstacle pathfinding, and a drivetrain physics simulation need additional implementation. Teams must build with the matching FRC tools, configure firmware, measure geometry, tune gains, verify direction and limits, and test on their robot. The autonomous canvas is a generic coordinate grid, not an official field map or collision checker.
+This generates robot projects for the supported drivetrain and hardware configurations. It is not an automatic competition-readiness certification. Other module counts, motor-controller-connected steering encoders, vision fusion, devices without an implemented profile, bidirectional position-limited mechanisms, mechanism PID/profiled setpoints, multi-path libraries, event markers, obstacle pathfinding, and a drivetrain physics simulation need additional implementation. Teams must build with the matching FRC tools, configure firmware, measure geometry, tune gains, verify direction and limits, and test on their robot. The autonomous canvas is a generic coordinate grid, not an official field map or collision checker.
 
 Projects are stored in the current browser on the current device. Download JSON backups to move or preserve them. No cloud team synchronization is provided. The optional WebMCP tools read the same project and navigate the editor; they do not deploy robots.
 
@@ -106,3 +134,15 @@ The mechanism shortcut, project import, and checkpoint restore first commit a re
 Checkpoints archive configuration and dependencies, not robot binaries, firmware, or handwritten source. Regeneration produces a complete project and does not merge custom source changes. Keep exported code and custom work in version control.
 
 Run `npm run test:development` for snapshot immutability, preserved assignments, incremental additions, CAN collisions, comparisons, restoration, backup round trips and merge limits, and generated exports before/after changes in Java, C++, and Python. Browser verification covers checkpoint creation, adding a motor/subsystem/command, restoration, import review and recovery, history import, reload persistence, and responsive layout.
+
+## Configure a drivetrain
+
+Open **Hardware → Drivetrain layout**. Existing backups stay differential until a different layout is selected. Layout changes preserve hardware, mechanisms, commands, controller bindings, and development checkpoints.
+
+- **Differential / West Coast / tank:** 1–4 motors per side with equal counts; choose arcade or independent tank axes in Controls. PathPlanner LTV following uses the actual motor count.
+- **Mecanum:** assign one wheel motor per corner, measure wheelbase and track width, and configure forward/strafe/turn axes. WPILib mecanum odometry and a holonomic trajectory follower use the configured waypoints. Mecanum routes use the entered coordinates unchanged on both alliances; PathPlanner files are reference geometry, not the runtime follower.
+- **Swerve:** assign four drive motors, four steering motors, and four CANcoder or roboRIO DIO duty-cycle absolute encoders. Configure each encoder's direction and forward offset. Generated code includes swerve kinematics, odometry, continuous steering control, module optimization, cosine compensation, and PathPlanner holonomic following. Invalid absolute feedback stops all eight motors. Steering encoders plugged into SPARK data ports are not currently supported.
+
+Traction feedback currently supports brushless SPARK MAX, SPARK Flex, and Talon FX. Swerve steering also supports Talon FXS using external absolute feedback. Select robot-relative or field-relative controls for mecanum/swerve; field-relative axes use the blue field reference. Tune geometry, gains, motor/encoder directions, and offsets on the actual robot. Exports include a drivetrain-specific `DRIVETRAIN.md` guide.
+
+Run `npm run test:drivetrains` for all 15 layout/language exports, mapping validation, and backup compatibility. `scripts/verify-drivetrain-runtime.py` exercises exported holonomic Python projects with installed RobotPy/vendor packages; copy it into the export directory before running, and use `--robot` for the full robot initialization check.
