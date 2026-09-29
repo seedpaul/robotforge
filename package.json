@@ -18,7 +18,8 @@
     "test:hardware": "node scripts/verify-hardware.mjs",
     "test:routines": "node scripts/verify-routines.mjs",
     "test:development": "node scripts/verify-development.mjs",
-    "test:drivetrains": "node scripts/verify-drivetrains.mjs"
+    "test:drivetrains": "node scripts/verify-drivetrains.mjs",
+    "test:wizard": "node scripts/verify-wizard.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

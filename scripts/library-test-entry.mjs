@@ -12,3 +12,5 @@ export * from '../lib/development.ts';
 export * from '../lib/checkpoint-store.ts';
 
 export * from '../lib/drivetrain.ts';
+
+export * from '../lib/build-wizard.ts';

@@ -23,7 +23,7 @@ export const motorCatalog: MotorProfile[] = [
 export const motorOptions = motorCatalog.map(m => ({value:m.type, label:`${m.brand} ${m.name}${m.javaOnly?' · Java':''}`}));
 
 /** Allocate only within the selected connection, including other configured devices. */
-export function newMotor(p: Project, type: Motor['type'], id: string): Motor {
+export function newMotor(p: Project, type: Motor['type'], id: string, subsystemId?:string): Motor {
  const profile = motorCatalog.find(m => m.type === type);
  if (!profile) throw Error('Choose a supported motor controller.');
  if (p.motors.length >= 40) throw Error('This project supports up to 40 motor controllers.');
@@ -39,7 +39,8 @@ export function newMotor(p: Project, type: Motor['type'], id: string): Motor {
  const addresses = pwm ? Array.from({length:20},(_,i)=>i) : [...Array.from({length:62},(_,i)=>i+1),0];
  const address = addresses.find(n => !used.has(n));
  if (address === undefined) throw Error(pwm ? 'No free PWM channels. Review your configured hardware first.' : 'No free CAN IDs on roboRIO CAN. Review your configured hardware first.');
- const subsystem = p.subsystems.find(s => s.id !== 'drive')?.id || 'drive';
+ const subsystem = subsystemId || p.subsystems.find(s => s.id !== 'drive')?.id || 'drive';
+ if (!p.subsystems.some(s=>s.id===subsystem)) throw Error('Choose an existing subsystem first.');
  if (subsystem === 'drive' && !['SparkMax','SparkFlex','TalonFX'].includes(type) && !(type==='TalonFXS'&&driveType(p)==='swerve')) throw Error('Add a mechanism in Subsystems first. This controller does not support generated drivetrain odometry.');
  let number = 1;
  while (p.motors.some(m => m.name === `${profile.name} ${number}`)) number++;

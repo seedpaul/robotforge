@@ -1,0 +1,84 @@
+import { rolldown } from 'rolldown';
+import assert from 'node:assert/strict';
+const bundle = await rolldown({ input: 'scripts/library-test-entry.mjs', platform: 'node', external: [/^node:/] });
+await bundle.write({ file: '.verification/wizard-test.mjs', format: 'esm' }); await bundle.close();
+const { initialProject, createDraft, parseProject, wizardProgress, readWizardPosition, newMotor,
+  newDevice, selectDrivetrain, validate, captureCheckpoint, restoreCheckpoint, assembleProject } = await import('../.verification/wizard-test.mjs');
+
+const draft = createDraft();
+assert.equal(draft.motors.length, 0);
+assert.equal(draft.commands.length, 0);
+assert.deepEqual(draft.subsystems.map(s=>s.id), ['drive']);
+assert.deepEqual(parseProject(JSON.stringify(draft)), draft, 'empty drafts save and reload');
+assert.equal(wizardProgress(draft).complete, false);
+assert.ok(validate(draft).some(i=>i.level==='error'&&i.area==='Hardware'), 'drafts cannot bypass drivetrain checks');
+await assert.rejects(()=>assembleProject(draft,async()=>new Uint8Array()), 'drafts cannot export robot code');
+assert.deepEqual(readWizardPosition('{'), {step:1,subsystem:'drive'});
+assert.deepEqual(readWizardPosition('{"step":9,"subsystem":"drive"}'), {step:1,subsystem:'drive'});
+assert.deepEqual(readWizardPosition('{"step":2,"subsystem":"intake"}'), {step:2,subsystem:'intake'});
+
+const base = {...structuredClone(initialProject), team:9999};
+const snapshot = JSON.stringify(base);
+assert.ok(wizardProgress(base).complete);
+assert.equal(JSON.stringify(base), snapshot, 'readiness must not mutate a saved project');
+const expanded = {...base,subsystems:[...base.subsystems,{id:'elevator',name:'Elevator',description:''}]};
+assert.equal(wizardProgress(expanded).complete, false);
+assert.deepEqual(wizardProgress(expanded).subsystems.filter(s=>s.complete).map(s=>s.id), ['drive','intake','shooter']);
+const motor = newMotor(expanded, 'SparkFlex', 'elevatorMotor', 'elevator');
+assert.equal(motor.subsystem, 'elevator');
+assert.equal(motor.role, 'mechanism');
+assert.ok(!base.motors.some(m=>m.can===motor.can), 'IDs remain unique across subsystems');
+const wired = {...expanded, motors:[...expanded.motors,motor]};
+assert.equal(wizardProgress(wired).subsystems.at(-1).status, 'Add commands');
+const completed = {...wired,commands:[...wired.commands,{id:'raiseElevator',name:'Raise elevator',subsystem:'elevator',output:.2,timeout:1}]};
+assert.ok(wizardProgress(completed).complete);
+assert.deepEqual(completed.motors.slice(0,base.motors.length),base.motors);
+assert.deepEqual(completed.commands.slice(0,base.commands.length),base.commands);
+assert.deepEqual(completed.bindings,base.bindings);
+assert.deepEqual(completed.auto,base.auto);
+assert.deepEqual(parseProject(JSON.stringify(completed)),completed);
+
+const collision = structuredClone(completed);
+collision.motors.find(m=>m.id==='elevatorMotor').can = collision.motors.find(m=>m.id==='intakeMotor').can;
+let result = wizardProgress(collision);
+assert.equal(result.subsystems.find(s=>s.id==='elevator').hardwareReady,false);
+assert.equal(result.subsystems.find(s=>s.id==='intake').hardwareReady,false);
+assert.equal(result.subsystems.find(s=>s.id==='shooter').complete,true);
+assert.equal(result.subsystems.find(s=>s.id==='drive').complete,true);
+assert.equal(result.complete,false,'a new conflict immediately removes completion');
+const limits=structuredClone(completed);
+limits.motors.find(m=>m.id==='intakeMotor').limit=0;
+limits.motors.find(m=>m.id==='elevatorMotor').limit=0;
+result=wizardProgress(limits);
+assert.equal(result.subsystems.find(s=>s.id==='intake').hardwareReady,false);
+assert.equal(result.subsystems.find(s=>s.id==='elevator').hardwareReady,false);
+assert.equal(result.subsystems.find(s=>s.id==='drive').complete,true,'limit-switch conflicts do not block unrelated subsystems');
+const deleted = {...completed, motors:completed.motors.filter(m=>m.id!=='elevatorMotor')};
+assert.equal(wizardProgress(deleted).subsystems.at(-1).complete,false);
+assert.equal(wizardProgress(deleted).subsystems.at(-1).commandErrors.length,1);
+
+const sensors = {...expanded,devices:[newDevice('maglimit','limit','elevator')]};
+result=wizardProgress(sensors);
+assert.equal(result.subsystems.at(-1).needsCommands,false);
+assert.equal(result.subsystems.at(-1).complete,true,'sensors-only subsystems do not require fake output commands');
+const badCommand = {...sensors,commands:[...sensors.commands,{id:'badOutput',name:'Bad output',subsystem:'elevator',device:'limit',output:.2,timeout:1}]};
+result=wizardProgress(badCommand);
+assert.equal(result.subsystems.at(-1).hardwareReady,true);
+assert.equal(result.subsystems.at(-1).commandsReady,false,'a sensor cannot act as a command output');
+
+const swerve={...completed,...selectDrivetrain(completed,'swerve')};
+result=wizardProgress(swerve);
+assert.equal(result.subsystems.find(s=>s.id==='drive').complete,false,'changing layout requires new module assignments');
+assert.equal(result.subsystems.find(s=>s.id==='elevator').complete,true);
+assert.throws(()=>newMotor(draft,'VictorSPX','badDrive','drive'));
+assert.throws(()=>newMotor(base,'SparkMax','orphan','missing'));
+const axisConflict={...base,controls:{...base.controls,turnAxis:base.controls.forwardAxis}};
+assert.equal(wizardProgress(axisConflict).subsystems.find(s=>s.id==='drive').commandsReady,false);
+const invalid={...base,motors:base.motors.map((m,i)=>i===0?{...m,can:NaN}:m)};
+assert.equal(wizardProgress(invalid).hardwareReady,false,'invalid draft values cannot show complete');
+
+const checkpoint=captureCheckpoint(completed,'Configured robot');
+const restored=restoreCheckpoint(checkpoint);
+assert.ok(wizardProgress(restored).complete,'restoring a checkpoint recalculates progress');
+assert.equal(JSON.stringify(base),snapshot,'all iterative edits preserve the original design');
+console.log('Wizard checks passed: draft persistence, scoped hardware, iterative additions, conflict attribution, commands, layout changes, checkpoints, and legacy projects.');

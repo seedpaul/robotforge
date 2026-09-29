@@ -46,7 +46,7 @@ export function selectDrivetrain(p:Project,type:DriveType):Partial<Project> {
   return {motors,drive:{...p.drive,type,wheelbase:p.drive.wheelbase??.6,maxAngularSpeed:p.drive.maxAngularSpeed??4,steerKP:p.drive.steerKP??4,translationKP:p.drive.translationKP??3,rotationKP:p.drive.rotationKP??3,wheelCOF:p.drive.wheelCOF??1.2,wheels,modules},controls:{...p.controls,driveStyle:type==='tank'?'tank':'arcade',strafeAxis:p.controls.strafeAxis??0,strafeSign:p.controls.strafeSign??-1,rightAxis:p.controls.rightAxis??5,rightSign:p.controls.rightSign??-1,fieldRelative:p.controls.fieldRelative??false},checks:{}};
 }
 export function validateDrivetrain(p:Project):Issue[] {
-  const issues:Issue[]=[];const error=(message:string)=>issues.push({level:'error',area:'Hardware',message});
+  const issues:Issue[]=[];const error=(message:string)=>issues.push({level:'error',area:'Hardware',message,subsystems:['drive']});
   const drive=p.motors.filter(m=>m.subsystem==='drive'),type=driveType(p),traction=tractionMotors(p);
   if(!p.subsystems.some(s=>s.id==='drive'))error('The drivetrain subsystem is required.');
   if(new Set(traction.map(m=>`${m.type}:${m.motorKind||'default'}`)).size>1)error('Use the same controller and physical motor model for all traction motors. Steering motors may differ.');
@@ -75,6 +75,6 @@ export function validateDrivetrain(p:Project):Issue[] {
     if(drive.some(m=>!used.has(m.id)))error('Assign every drivetrain motor to a wheel or module, or move unused motors to another subsystem.');
   }
   const axes=controlStyle(p)==='tank'?[p.controls.forwardAxis,p.controls.rightAxis??5]:isHolonomic(p)?[p.controls.forwardAxis,p.controls.strafeAxis??0,p.controls.turnAxis]:[p.controls.forwardAxis,p.controls.turnAxis];
-  if(new Set(axes).size!==axes.length)issues.push({level:'error',area:'Controls',message:'Each active drive function must use a different controller axis.'});
+  if(new Set(axes).size!==axes.length)issues.push({level:'error',area:'Controls',subsystems:['drive'],message:'Each active drive function must use a different controller axis.'});
   return issues;
 }

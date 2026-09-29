@@ -23,6 +23,18 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 
 Robot projects use pinned WPILib/GradleRIO 2026.2.1, RobotPy 2026.2.2, REVLib 2026.0.5 (Python binding 2026.0.4), Phoenix 6 26.3.0, and PathPlannerLib 2026.1.2. Versions were checked against upstream metadata on 2026-09-28.
 
+## Build with the wizard
+
+RobotForge opens in **Build wizard**.
+
+1. **Plan your robot:** enter the team number and project name, choose Java/C++/Python and a drivetrain, then define the subsystems.
+2. **Add the hardware:** select a subsystem and add its motor controllers, sensors, and other components. New components belong to the selected subsystem; addressing still checks the whole robot. Configure drivetrain feedback and wheel/module assignments here.
+3. **Give it commands:** define bounded actions and optional sensor stops for each mechanism. Configure the default driver command for the drivetrain. Sensor-only and passive subsystems do not require artificial output commands. Continue to button assignments, autonomous, and preflight.
+
+The robot schematic highlights configured subsystems and lists what still needs work. Progress is derived from the current design, including shared-port conflicts; adding a subsystem or breaking an assignment updates it immediately. Green indicates configuration, not successful compilation or physical commissioning. The wizard remembers its step and selected subsystem on this device. Existing backups, checkpoints, and the detailed editors use the same project data. Fresh projects start without example motors or commands, and incomplete drafts can be saved before hardware is added.
+
+`npm run test:wizard` verifies draft persistence, subsystem ownership, cross-subsystem collision handling, iterative additions, completion changes, and checkpoint compatibility.
+
 ## Configure motor controllers
 
 In **Hardware → Component library**, choose **Motor controllers** or search for SPARK MAX, SPARK Flex, Talon FX/FXS/SRX, Victor SPX/SP, or Thrifty Nova. **Add** creates that controller in the motor configuration and takes you to its name, CAN ID/PWM channel, subsystem, motor model, and limits. Suggested addresses account for other motors, sensors, the drivetrain gyro, servos, and LED outputs. Thrifty Nova is marked Java-only. The catalog and controller selector share the same profiles; existing saved projects keep their original motor configuration.
