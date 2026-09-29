@@ -4,7 +4,7 @@ RobotForge has a separate static build for GitHub Pages. It uses the same editor
 
 ## Build and test
 
-Use Node.js 22.13 or newer:
+The Pages workflow pins Node.js 24.13.0 and npm 11.6.2, matching the verified local build. Use these versions for a reproducible clean install:
 
 ```sh
 npm ci
