@@ -33,6 +33,18 @@ RobotForge opens in **Build wizard**.
 
 The robot schematic highlights configured subsystems and lists what still needs work. Progress is derived from the current design, including shared-port conflicts; adding a subsystem or breaking an assignment updates it immediately. Green indicates configuration, not successful compilation or physical commissioning. The wizard remembers its step and selected subsystem on this device. Existing backups, checkpoints, and the detailed editors use the same project data. Fresh projects start without example motors or commands, and incomplete drafts can be saved before hardware is added.
 
+### Visual chassis builder
+
+The wizard's first step includes a draggable parts tray. Choose swerve, differential, West Coast, tank, or mecanum drive; add turret, shooter, indexer, intake, arm, elevator, climber, and custom mechanisms. Changing the drivetrain preserves existing hardware and commands for reassignment. Each mechanism gets a unique subsystem and can be moved around the chassis without changing its code or commissioning confirmations.
+
+Click a placed icon to open **About → Motors → Sensors & devices → Commands → Review**. The drivetrain has dedicated geometry, module-assignment, and driver-control steps. Each editor works on that subsystem while checking conflicts across the whole robot. Color reflects the current configuration, including changes made in the detailed editors.
+
+On touch screens, select a part and tap the chassis. Keyboard users can select a template, focus the chassis, and press Enter to place it; arrow keys move a focused mechanism and Enter opens its setup. Named subsystem buttons beneath the canvas remain accessible when icons overlap. Positions and icon choices survive project backups and development checkpoints; older projects receive a default layout.
+
+The chassis is a visual organizer. Icon positions do not set robot geometry or offsets. Turret, arm, elevator, and climber templates organize hardware and bounded output commands; closed-loop angle/position control still requires additional robot code.
+
+`npm run test:designer` verifies layout persistence, legacy compatibility, placement bounds, incremental additions, drivetrain replacement, preserved assignments, completion changes, and generated-code stability when moving icons.
+
 `npm run test:wizard` verifies draft persistence, subsystem ownership, cross-subsystem collision handling, iterative additions, completion changes, and checkpoint compatibility.
 
 ## Configure motor controllers

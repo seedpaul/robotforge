@@ -19,7 +19,8 @@
     "test:routines": "node scripts/verify-routines.mjs",
     "test:development": "node scripts/verify-development.mjs",
     "test:drivetrains": "node scripts/verify-drivetrains.mjs",
-    "test:wizard": "node scripts/verify-wizard.mjs"
+    "test:wizard": "node scripts/verify-wizard.mjs",
+    "test:designer": "node scripts/verify-designer.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

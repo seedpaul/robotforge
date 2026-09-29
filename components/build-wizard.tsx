@@ -1,10 +1,12 @@
 "use client";
 import { ArrowLeft, ArrowRight, Boxes, Cable, Check, CheckCircle2, Circle, CircleAlert, Flag, Gamepad2, Plus, Route, Zap } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { Issue, Project } from '@/lib/robot-model';
 import { driveLabel, driveType } from '@/lib/drivetrain';
 import { wizardProgress, type SubsystemProgress, type WizardPosition, type WizardStep } from '@/lib/build-wizard';
 import { Hardware, Commands, Subsystems } from './studio-views';
+import SubsystemSetup from './subsystem-setup';
+import RobotDesigner from './robot-designer';
 import { DrivetrainEditor, DriveControls } from './drivetrain-editor';
 
 type Props = { project: Project; update: (patch: Partial<Project>) => void; issues: Issue[];
@@ -52,6 +54,7 @@ function RobotVisual({ project, items, selected, onSelect }: { project: Project;
 }
 
 export default function BuildWizard({ project, update, issues, setTab, saveStatus, position, onPosition }: Props) {
+  const [setupId,setSetupId]=useState<string|null>(null);
   const progress = wizardProgress(project, issues), step = position.step;
   const selected = progress.subsystems.find(s=>s.id===position.subsystem) || progress.subsystems[0];
   const content = useRef<HTMLHeadingElement>(null);
@@ -65,21 +68,21 @@ export default function BuildWizard({ project, update, issues, setTab, saveStatu
   const index = progress.subsystems.findIndex(s=>s.id===selected?.id);
   const nextSubsystem = progress.subsystems[index+1];
   return <div className="build-wizard">
-    <div className="page-heading"><div><div className="eyebrow">BUILD WIZARD</div><h1>From robot idea to robot code.</h1><p>Three steps. One subsystem at a time. Come back whenever your robot changes.</p></div><span className="wizard-draft-tag">{saveStatus}</span></div>
+    <div className="page-heading"><div><div className="eyebrow">BUILD WIZARD</div><h1>Build your robot.</h1><p>Place your subsystems, connect the hardware, and define what each one does.</p></div><span className="wizard-draft-tag">{saveStatus}</span></div>
     <nav className="wizard-steps" aria-label="Robot creation steps">{steps.map((s,i)=><button key={s.title} aria-current={step===i+1?'step':undefined} onClick={()=>move((i+1) as WizardStep)}>
       <span className={'wizard-step-number '+(stageReady[i]?'done':'')}>{stageReady[i]?<Check size={20}/>:i+1}</span><span><b>{s.title}</b><small>{s.detail}</small></span>
     </button>)}</nav>
-    <div className="wizard-layout">
+    <div className={"wizard-layout "+(step===1?"designer-planning":"")}>
       <div className="wizard-editor">
         <div className="wizard-stage-heading"><span>STEP {step} OF 3</span><h2 ref={content} tabIndex={-1}>{steps[step-1].title}</h2><p>{step===1?'Tell us about your team and the mechanisms you plan to build.':step===2?'Choose a subsystem, then add and configure its real hardware.': 'Choose a subsystem and describe what you want it to do.'}</p></div>
-        {step===1?<div className="view-stack">
+        {step===1?<div className="view-stack"><RobotDesigner project={project} update={update} issues={issues} onConfigure={setSetupId}/>
           <section className="panel"><div className="panel-title"><div><h2>Your team & project</h2><p>This information travels with your generated robot code.</p></div><Flag size={22}/></div><div className="form-grid wizard-team-fields">
             <label className="form-field"><span>Team number</span><input aria-label="Team number" type="number" min="1" max="99999" placeholder="e.g. 254" value={project.team||''} onChange={e=>update({team:e.target.value===''?0:e.target.valueAsNumber})}/></label>
             <label className="form-field"><span>Team / robot project name</span><input aria-label="Team / robot project name" maxLength={60} value={project.name} onChange={e=>update({name:e.target.value})}/></label>
             <label className="form-field"><span>Robot code language</span><select aria-label="Robot code language" value={project.language} onChange={e=>update({language:e.target.value as Project['language']})}>{['Java','C++','Python'].map(l=><option key={l}>{l}</option>)}</select></label>
           </div>{!progress.setupReady&&<p className="wizard-inline-help">Enter a team number and name, and give each subsystem a name to complete this step.</p>}</section>
-          <DrivetrainEditor project={project} update={update} layoutOnly/>
-          <section className="wizard-subsystems"><div className="wizard-section-label"><Boxes size={20}/><div><h2>Define your subsystems</h2><p>Keep the drivetrain. Add mechanisms such as an intake, shooter, arm, elevator, or climber.</p></div></div><Subsystems {...shared}/></section>
+
+          <details className="wizard-subsystems designer-list-editor"><summary>Manage subsystem list</summary><Subsystems {...shared}/></details>
         </div>:selected?<>
           <div className="wizard-subsystem-picker"><label className="form-field"><span>Working on subsystem</span><select aria-label="Working on subsystem" value={selected.id} onChange={e=>select(e.target.value)}>{progress.subsystems.map(s=><option key={s.id} value={s.id}>{s.name} · {step===2?(s.hardwareReady?'Hardware configured':'Needs hardware setup'):(s.complete?'Configured':s.status)}</option>)}</select></label><button className="text-button" onClick={()=>move(1)}><Plus size={15}/>Add a subsystem</button></div>
           <div className="wizard-subsystem-context"><span className="card-icon">{step===2?<Cable size={22}/>:<Zap size={22}/>}</span><div><h3>{selected.name}</h3><p>{selected.description || 'Build this subsystem at your own pace.'}</p><small>{selected.motors} motor controllers · {selected.devices} other components · {selected.id==='drive'?'Default drive command':`${selected.commands} commands`}</small></div><span className={'wizard-status '+(selected.complete?'complete':'')}>{selected.status}</span></div>
@@ -102,7 +105,8 @@ export default function BuildWizard({ project, update, issues, setTab, saveStatu
         {step===3&&<section className="wizard-finish"><CheckCircle2 size={25}/><div><h2>{progress.complete?'Your robot configuration is taking shape.':'Keep building at your own pace.'}</h2><p>{progress.subsystems.filter(s=>s.complete).length} of {progress.subsystems.length} subsystems configured. Next, assign command buttons, plan autonomous, and run preflight before building and deploying.</p><div><button className="button" onClick={()=>setTab('Controls')}><Gamepad2 size={16}/>Assign buttons</button><button className="button" onClick={()=>setTab('Logic builder')}>Combine commands</button></div></div></section>}
         <div className="wizard-navigation"><button className="button" disabled={step===1} onClick={()=>move((step-1) as WizardStep)}><ArrowLeft size={16}/>Back</button><span>{stageReady[step-1]?<><CheckCircle2 size={16}/>Step configured</>:'You can revisit any step.'}</span><button className="button primary" onClick={()=>step<3?move((step+1) as WizardStep,'drive'):setTab('Preflight')}>{step===1?'Continue to hardware':step===2?'Continue to commands':'Review preflight'}<ArrowRight size={16}/></button></div>
       </div>
-      <RobotVisual project={project} items={progress.subsystems} selected={selected?.id||'drive'} onSelect={select}/>
+      {step!==1&&<RobotVisual project={project} items={progress.subsystems} selected={selected?.id||'drive'} onSelect={select}/>}
     </div>
+    {setupId&&<SubsystemSetup key={setupId} project={project} update={update} issues={issues} subsystemId={setupId} onClose={()=>setSetupId(null)} setTab={setTab}/>}
   </div>;
 }
