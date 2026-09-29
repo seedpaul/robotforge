@@ -8,7 +8,7 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 
 ## Features
 
-- Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF
+- Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF, including all 12 supported CAN/PWM motor-controller profiles
 - CAN and PWM motor controllers, named CANivore buses, validated I/O allocation, automatic vendor dependencies, and wiring inventory
 - Differential drivetrain with two motors per side, integrated encoders, ADXRS450, Pigeon 2, or navX gyro
 - Mechanism subsystems, bounded motor / servo / pneumatic / LED commands, sensor stop conditions, and active-low forward DIO limits
@@ -22,6 +22,10 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 - Paired local companion with build logs, cached/offline builds, and explicit team-confirmed deployment to a roboRIO using GradleRIO or RobotPy
 
 Robot projects use pinned WPILib/GradleRIO 2026.2.1, RobotPy 2026.2.2, REVLib 2026.0.5 (Python binding 2026.0.4), Phoenix 6 26.3.0, and PathPlannerLib 2026.1.2. Versions were checked against upstream metadata on 2026-09-28.
+
+## Configure motor controllers
+
+In **Hardware → Component library**, choose **Motor controllers** or search for SPARK MAX, SPARK Flex, Talon FX/FXS/SRX, Victor SPX/SP, or Thrifty Nova. **Add** creates that controller in the motor configuration and takes you to its name, CAN ID/PWM channel, subsystem, motor model, and limits. Suggested addresses account for other motors, sensors, the drivetrain gyro, servos, and LED outputs. Thrifty Nova is marked Java-only. The catalog and controller selector share the same profiles; existing saved projects keep their original motor configuration.
 
 ## Deploy from the browser
 
