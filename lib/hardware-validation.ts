@@ -3,7 +3,7 @@ import type { Project,Issue } from './robot-model';
 export function validateHardware(p:Project):Issue[]{
  const issues:Issue[]=[];const error=(message:string)=>issues.push({level:'error',area:'Hardware',message});
  const used=new Map<string,string>();const claim=(key:string,name:string)=>{if(used.has(key))error(`${key} is shared by ${used.get(key)} and ${name}.`);else used.set(key,name);};
- if(new Set(p.motors.filter(m=>m.subsystem==='drive').map(m=>m.motorKind||'default')).size>1)error('All drive motors must use the same physical motor model.');
+
  const devices=p.devices||[];const buses=new Set(['rio']);
  for(const d of devices.filter(d=>productById(d.product)?.adapter==='canbus')){if(buses.has(d.bus))error(`CANivore bus names must be unique and cannot be rio (${d.name}).`);buses.add(d.bus);}
  const can=(bus:string,id:number,name:string,ctre=false)=>{if(!buses.has(bus))error(`${name}: add CANivore “${bus}” first.`);if(bus!=='rio'&&!ctre)error(`${name} must use roboRIO CAN; its API does not support CANivore.`);claim(`CAN ${bus}:${id}`,name);};
@@ -14,7 +14,7 @@ export function validateHardware(p:Project):Issue[]{
   if(!allowed.includes(m.motorKind||'default'))error(m.name+': choose a motor model supported by this controller.');
   if(m.subsystem==='drive'&&m.motorKind==='brushed')error(m.name+': integrated drivetrain feedback requires a brushless motor.');
   if(m.type==='ThriftyNova'&&p.language!=='Java')error(`${m.name}: ThriftyLib provides a Java adapter only. Select Java or another controller.`);
-  if(m.subsystem==='drive'&&!['SparkMax','SparkFlex','TalonFX'].includes(m.type))error(`${m.name}: this controller is supported for mechanism commands; drivetrain odometry currently requires SPARK MAX, Flex, or Talon FX.`);
+  if(m.subsystem==='drive'&&!(m.role==='steer'?['SparkMax','SparkFlex','TalonFX','TalonFXS']:['SparkMax','SparkFlex','TalonFX']).includes(m.type))error(`${m.name}: this controller is supported for mechanism commands; drivetrain odometry currently requires SPARK MAX, Flex, or Talon FX.`);
  }
  if(p.drive.gyro==='Pigeon2')can(p.drive.gyroBus||'rio',p.drive.gyroCan,'Drive Pigeon 2',true);
  if(p.drive.gyro==='NavX')claim(`navx ${p.drive.navxInterface||'mxp'}`,'Drive navX');

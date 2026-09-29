@@ -17,7 +17,8 @@
     "db:generate": "drizzle-kit generate",
     "test:hardware": "node scripts/verify-hardware.mjs",
     "test:routines": "node scripts/verify-routines.mjs",
-    "test:development": "node scripts/verify-development.mjs"
+    "test:development": "node scripts/verify-development.mjs",
+    "test:drivetrains": "node scripts/verify-drivetrains.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

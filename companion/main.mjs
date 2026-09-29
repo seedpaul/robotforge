@@ -11,4 +11,4 @@ if (process.env.ROBOTFORGE_DEV_ORIGIN) {
 const companion = createCompanion({ assets, origins });
 try { await companion.start(); }
 catch (error) { console.error(`Cannot start RobotForge Companion: ${error.message}. Close another running companion and retry.`); process.exit(1); }
-console.log(`\nRobotForge Companion 1.3.0\nListening on this computer only: 127.0.0.1:${PORT}\n\nOpen ${SITE}\nCode & export > Deploy to robot\n\nPairing code: ${companion.token}\n\nKeep this window open. The pairing code changes every time you restart.\nBuilds are saved in your home folder under .robotforge/builds.\nDo not close this window while deploying. Press Ctrl+C when finished.\n`);
+console.log(`\nRobotForge Companion 1.4.0\nListening on this computer only: 127.0.0.1:${PORT}\n\nOpen ${SITE}\nCode & export > Deploy to robot\n\nPairing code: ${companion.token}\n\nKeep this window open. The pairing code changes every time you restart.\nBuilds are saved in your home folder under .robotforge/builds.\nDo not close this window while deploying. Press Ctrl+C when finished.\n`);

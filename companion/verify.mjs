@@ -33,6 +33,7 @@ const project = { ...structuredClone(initialProject), team: 9999 };
 const input = { project, connection: 'network', offline: false };
 const next = () => new Promise(r=>setTimeout(r, 1050));
 try {
+  assert.equal((await api('/status')).protocol, 5, 'older drivetrain generators must be rejected by the browser');
   assert.equal((await api('/status', null, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await api('/status', null, { Authorization: 'Bearer wrong' })).status, 401);
   const badHostStatus = await new Promise(resolve => { http.get(url + '/status', { headers: { ...headers, Host: 'rebind.example' } }, response => { response.resume(); resolve(response.statusCode); }); });

@@ -1,3 +1,4 @@
+import { isHolonomic,driveType } from './drivetrain';
 import type { Motor, Project } from './robot-model';
 import { productById } from './hardware-catalog';
 
@@ -9,7 +10,7 @@ export const motorCatalog: MotorProfile[] = [
  { type:'SparkMax', name:'SPARK MAX', brand:'REV Robotics', connection:'CAN', description:'REVLib motor control for NEO brushless or brushed DC motors. Configure CAN ID, motor model, current limit, direction, and subsystem.', docs:rev+'brushless/spark-max/overview' },
  { type:'SparkFlex', name:'SPARK Flex', brand:'REV Robotics', connection:'CAN', description:'REVLib motor control with NEO Vortex brushless or brushed motor settings. Includes integrated encoder feedback for the supported brushless drivetrain.', docs:rev+'brushless/spark-flex/overview' },
  { type:'TalonFX', name:'Talon FX · Kraken X60 / Falcon 500', brand:'CTRE', brands:['CTRE','WCP','VEXpro'], connection:'CAN', description:'Phoenix 6 control for the integrated Talon FX in WCP Kraken X60 and Falcon 500 motors. Select roboRIO CAN or a configured CANivore bus.', docs:ctre+'talonfx/index.html' },
- { type:'TalonFXS', name:'Talon FXS', brand:'CTRE', connection:'CAN', description:'Phoenix 6 mechanism motor control for Minion, NEO, or brushed DC. Supports roboRIO CAN and CANivore; generated drivetrain odometry is not supported.', docs:ctre+'talonfxs/index.html' },
+ { type:'TalonFXS', name:'Talon FXS', brand:'CTRE', connection:'CAN', description:'Phoenix 6 mechanism control, plus brushless swerve steering with an external absolute encoder. Supports roboRIO CAN and CANivore; traction odometry is not generated for this controller.', docs:ctre+'talonfxs/index.html' },
  { type:'TalonSRX', name:'Talon SRX', brand:'CTRE', connection:'CAN', description:'Phoenix 5 brushed mechanism control with current limiting. Use roboRIO CAN. Generated drivetrain odometry is not supported.', docs:legacy },
  { type:'VictorSPX', name:'Victor SPX', brand:'CTRE', brands:['CTRE','VEXpro'], connection:'CAN', description:'Phoenix 5 brushed mechanism control on roboRIO CAN. No software current limiting or generated drivetrain odometry.', docs:legacy },
  { type:'ThriftyNova', name:'Thrifty Nova', brand:'The Thrifty Bot', connection:'CAN', javaOnly:true, description:'ThriftyLib mechanism control for NEO, Minion, or brushed DC motors. The generated adapter is Java only; drivetrain odometry is not supported.', docs:'https://docs.thethriftybot.com/' },
@@ -39,10 +40,10 @@ export function newMotor(p: Project, type: Motor['type'], id: string): Motor {
  const address = addresses.find(n => !used.has(n));
  if (address === undefined) throw Error(pwm ? 'No free PWM channels. Review your configured hardware first.' : 'No free CAN IDs on roboRIO CAN. Review your configured hardware first.');
  const subsystem = p.subsystems.find(s => s.id !== 'drive')?.id || 'drive';
- if (subsystem === 'drive' && !['SparkMax','SparkFlex','TalonFX'].includes(type)) throw Error('Add a mechanism in Subsystems first. This controller does not support generated drivetrain odometry.');
+ if (subsystem === 'drive' && !['SparkMax','SparkFlex','TalonFX'].includes(type) && !(type==='TalonFXS'&&driveType(p)==='swerve')) throw Error('Add a mechanism in Subsystems first. This controller does not support generated drivetrain odometry.');
  let number = 1;
  while (p.motors.some(m => m.name === `${profile.name} ${number}`)) number++;
- return {id, name:`${profile.name} ${number}`, type, can:address, bus:'rio', motorKind:'default', subsystem, role:subsystem === 'drive' ? 'left' : 'mechanism', inverted:false, sensorSign:1, current:30, limit:-1};
+ return {id, name:`${profile.name} ${number}`, type, can:address, bus:'rio', motorKind:'default', subsystem, role:subsystem === 'drive' ? (type==='TalonFXS'&&driveType(p)==='swerve'?'steer':isHolonomic(p)?'wheel':'left') : 'mechanism', inverted:false, sensorSign:1, current:30, limit:-1};
 }
 export function motorKinds(type:Motor['type']){
  if(type==='TalonFX')return [{value:'default',label:'Kraken X60'},{value:'falcon',label:'Falcon 500'}];

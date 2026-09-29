@@ -10,7 +10,7 @@ Install Node.js 22.13 or newer, then run `npm install` and `npm run dev`.
 
 - Searchable component catalog covering CTRE, REV, AndyMark, Limelight, Thrifty Bot, Kauai Labs / Studica, SDS, VEXpro, WCP, and PWF, including all 12 supported CAN/PWM motor-controller profiles
 - CAN and PWM motor controllers, named CANivore buses, validated I/O allocation, automatic vendor dependencies, and wiring inventory
-- Differential drivetrain with two motors per side, integrated encoders, ADXRS450, Pigeon 2, or navX gyro
+- Differential, West Coast, tank, mecanum, and four-module swerve drivetrains, integrated drive encoders, ADXRS450, Pigeon 2, or navX gyro
 - Mechanism subsystems, bounded motor / servo / pneumatic / LED commands, sensor stop conditions, and active-low forward DIO limits
 - Mechanism map linking devices to commands and their uses; a guided build order with actionable configuration findings
 - Visual routines with action/wait blocks, sequence and parallel/race/deadline composition, live Java/C++/Python factories, undo, and controller/autonomous reuse
@@ -55,7 +55,7 @@ The companion was exercised on Windows with a real Java build and native depende
 
 ## Scope and limitations
 
-This is an initial functional generator for differential-drive robots. It is not an automatic competition-readiness certification. Swerve, vision fusion, devices without an implemented profile, bidirectional position-limited mechanisms, mechanism PID/profiled setpoints, multi-path libraries, event markers, obstacle pathfinding, and a drivetrain physics simulation need additional implementation. Teams must build with the matching FRC tools, configure firmware, measure geometry, tune gains, verify direction and limits, and test on their robot. The autonomous canvas is a generic coordinate grid, not an official field map or collision checker.
+This generates robot projects for the supported drivetrain and hardware configurations. It is not an automatic competition-readiness certification. Other module counts, motor-controller-connected steering encoders, vision fusion, devices without an implemented profile, bidirectional position-limited mechanisms, mechanism PID/profiled setpoints, multi-path libraries, event markers, obstacle pathfinding, and a drivetrain physics simulation need additional implementation. Teams must build with the matching FRC tools, configure firmware, measure geometry, tune gains, verify direction and limits, and test on their robot. The autonomous canvas is a generic coordinate grid, not an official field map or collision checker.
 
 Projects are stored in the current browser on the current device. Download JSON backups to move or preserve them. No cloud team synchronization is provided. The optional WebMCP tools read the same project and navigate the editor; they do not deploy robots.
 
@@ -108,3 +108,15 @@ The mechanism shortcut, project import, and checkpoint restore first commit a re
 Checkpoints archive configuration and dependencies, not robot binaries, firmware, or handwritten source. Regeneration produces a complete project and does not merge custom source changes. Keep exported code and custom work in version control.
 
 Run `npm run test:development` for snapshot immutability, preserved assignments, incremental additions, CAN collisions, comparisons, restoration, backup round trips and merge limits, and generated exports before/after changes in Java, C++, and Python. Browser verification covers checkpoint creation, adding a motor/subsystem/command, restoration, import review and recovery, history import, reload persistence, and responsive layout.
+
+## Configure a drivetrain
+
+Open **Hardware → Drivetrain layout**. Existing backups stay differential until a different layout is selected. Layout changes preserve hardware, mechanisms, commands, controller bindings, and development checkpoints.
+
+- **Differential / West Coast / tank:** 1–4 motors per side with equal counts; choose arcade or independent tank axes in Controls. PathPlanner LTV following uses the actual motor count.
+- **Mecanum:** assign one wheel motor per corner, measure wheelbase and track width, and configure forward/strafe/turn axes. WPILib mecanum odometry and a holonomic trajectory follower use the configured waypoints. Mecanum routes use the entered coordinates unchanged on both alliances; PathPlanner files are reference geometry, not the runtime follower.
+- **Swerve:** assign four drive motors, four steering motors, and four CANcoder or roboRIO DIO duty-cycle absolute encoders. Configure each encoder's direction and forward offset. Generated code includes swerve kinematics, odometry, continuous steering control, module optimization, cosine compensation, and PathPlanner holonomic following. Invalid absolute feedback stops all eight motors. Steering encoders plugged into SPARK data ports are not currently supported.
+
+Traction feedback currently supports brushless SPARK MAX, SPARK Flex, and Talon FX. Swerve steering also supports Talon FXS using external absolute feedback. Select robot-relative or field-relative controls for mecanum/swerve; field-relative axes use the blue field reference. Tune geometry, gains, motor/encoder directions, and offsets on the actual robot. Exports include a drivetrain-specific `DRIVETRAIN.md` guide.
+
+Run `npm run test:drivetrains` for all 15 layout/language exports, mapping validation, and backup compatibility. `scripts/verify-drivetrain-runtime.py` exercises exported holonomic Python projects with installed RobotPy/vendor packages; copy it into the export directory before running, and use `--robot` for the full robot initialization check.

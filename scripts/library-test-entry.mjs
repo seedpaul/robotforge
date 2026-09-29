@@ -10,3 +10,5 @@ export * from '../lib/component-catalog.ts';
 export * from '../lib/routines.ts';
 export * from '../lib/development.ts';
 export * from '../lib/checkpoint-store.ts';
+
+export * from '../lib/drivetrain.ts';
