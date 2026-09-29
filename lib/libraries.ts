@@ -27,6 +27,10 @@ export type LibraryLock = z.infer<typeof libraryLockSchema>;
 export const librarySettingsSchema = z.object({ mode: z.enum(['automatic', 'frozen']), extras: z.array(vendorId).max(5), lock: libraryLockSchema, previous: libraryLockSchema.optional() }).strict();
 export type LibrarySettings = z.infer<typeof librarySettingsSchema>;
 export type LibraryCatalog = { lock: LibraryLock; errors: string[]; checkedAt: string; sources: Record<string, 'live'|'bundled'> };
+export function validateLibraryCatalog(data: unknown): LibraryCatalog {
+  const catalog = z.object({ lock: libraryLockSchema, errors: z.array(z.string().max(1000)).max(100), checkedAt: z.string().datetime(), sources: z.record(z.enum(['live', 'bundled'])) }).strict().parse(data);
+  return { ...catalog, lock: validateLibraryLock(catalog.lock) };
+}
 
 export function compareVersions(a: string, b: string) {
   const av = a.replace(/^v/, '').split('.').map(Number), bv = b.replace(/^v/, '').split('.').map(Number);
