@@ -32,6 +32,7 @@ jobs:
       - run: node node_modules/typescript/bin/tsc --noEmit
       - run: npm run test:libraries
       - run: npm run test:development
+      - run: npm run test:can-addresses
       - run: npm run test:drivetrains
       - run: npm run test:wizard
       - run: npm run test:designer

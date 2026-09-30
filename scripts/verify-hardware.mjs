@@ -11,17 +11,17 @@ for(const query of ['SPARK MAX','sparkmax','REV SPARK MAX'])assert.ok(filterComp
 assert.ok(filterComponents('Kraken','WCP','Motor controllers').some(m=>m.type==='TalonFX'));
 assert.ok(filterComponents('CANrange','CTRE').some(d=>d.id==='canrange'),'peripheral discovery retained');
 let allocation=base();allocation.devices.push({...newDevice('canrange','range','intake'),address:7});allocation.drive.gyro='Pigeon2';allocation.drive.gyroCan=8;
-assert.equal(newMotor(allocation,'TalonFX','test').can,9,'skip motor, sensor and drivetrain gyro CAN IDs');
+assert.equal(newMotor(allocation,'TalonFX','test').can,null,'CAN IDs are entered explicitly');
 allocation.devices.push({...newDevice('servo','servo','intake'),channel:0},{...newDevice('blinkin','lights','intake'),channel:1});
 assert.equal(newMotor(allocation,'PWMSpark','pwm').can,2,'PWM allocation includes servo and LED channels, separately from CAN');
 allocation.devices=Array.from({length:20},(_,i)=>({...newDevice('servo','s'+i,'intake'),channel:i}));
 assert.throws(()=>newMotor(allocation,'PWMSpark','full'),/No free PWM/);
 allocation=base();allocation.devices=Array.from({length:63},(_,i)=>({...newDevice('canrange','r'+i,'intake'),address:i}));
-assert.throws(()=>newMotor(allocation,'SparkMax','full'),/No free CAN/);
+assert.equal(newMotor(allocation,'SparkMax','full').can,null,'inventory can be drafted before bus/address configuration');
 allocation=base();allocation.language='Python';assert.throws(()=>newMotor(allocation,'ThriftyNova','java'),/Java/);
 allocation=base();allocation.motors=Array.from({length:40},(_,i)=>({...allocation.motors[0],id:'m'+i}));assert.throws(()=>newMotor(allocation,'SparkMax','full'),/40 motor/);
 for(const language of ['Java','C++','Python'])for(const profile of motorCatalog.filter(m=>!m.javaOnly||language==='Java')){
- const project=base();project.language=language;const motor=newMotor(project,profile.type,'catalogMotor');project.motors.push(motor);
+ const project=base();project.language=language;const motor=newMotor(project,profile.type,'catalogMotor');if(!profile.type.startsWith('PWM'))motor.can=42;project.motors.push(motor);
  assert.ok(motorSchema.safeParse(motor).success);assert.equal(motor.type,profile.type);assert.equal(motor.subsystem,'intake');assert.equal(motor.role,'mechanism');
  assert.deepEqual(validate(project).filter(i=>i.level==='error'),[],language+' '+profile.type);
 }

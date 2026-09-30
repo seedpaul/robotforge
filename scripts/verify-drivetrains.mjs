@@ -70,6 +70,11 @@ const unitFixture=type=>{
   }
  }
  assert.equal(JSON.stringify(original),untouched,'assembly must not mutate prior project/checkpoint');
+ const pending=[...p.motors.filter(m=>m.subsystem==='drive'),...p.devices.filter(d=>d.product==='cancoder')];
+ assert.ok(pending.every(c=>('can' in c?c.can:c.address)===null),'new drivetrain CAN addresses start blank');
+ assert.ok(errors(p).some(i=>i.message.includes('enter the actual CAN ID')));
+ const entered=[31,12,48,9,27,44,2,57,19,35,41,53];
+ pending.forEach((c,i)=>{if('can' in c)c.can=entered[i];else c.address=entered[i];});
  assert.ok(drivetrainUnits(p).every(u=>u.complete));
  assert.deepEqual(errors(p),[],type+' unit assembly');
  assert.deepEqual(p.commands,initialProject.commands);assert.deepEqual(p.bindings,initialProject.bindings);

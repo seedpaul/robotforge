@@ -60,7 +60,9 @@ let assembled={...robot,team:54321};
 assembled={...assembled,...placeComponent(assembled,'turretOne','motor-SparkMax','turretController',{x:.2,y:.2})};
 const motor=assembled.motors.at(-1);
 assert.equal(motor.subsystem,'turretOne');
-assert.equal(motor.can,7,'new controller avoids existing CAN IDs across all subsystems');
+assert.equal(motor.can,null,'new CAN controllers require the actual hardware ID');
+assert.deepEqual(parseProject(JSON.stringify(assembled)).motors.at(-1).can,null);
+motor.can=42; // Team-entered address; visual-layout comparisons below need an exportable project.
 assert.deepEqual(assembled.checks,{},'adding hardware resets commissioning confirmations');
 const dio=hardwareCatalog.find(d=>d.adapter==='digital').id;
 const quad=hardwareCatalog.find(d=>d.adapter==='quadrature').id;
@@ -75,7 +77,7 @@ const pwmMotor={...assembled,...placeComponent(assembled,'turretOne','motor-PWMS
 const servo=newProjectDevice(pwmMotor,hardwareCatalog.find(d=>d.adapter==='servo').id,'servoOne','turretOne');
 assert.equal(servo.channel,1,'servos avoid PWM controller channels');
 const canSensor=newProjectDevice({...assembled,drive:{...assembled.drive,gyro:'Pigeon2',gyroCan:8}},hardwareCatalog.find(d=>d.adapter==='cancoder').id,'canEncoder','turretOne');
-assert.equal(canSensor.address,9,'sensors avoid controllers and the drivetrain gyro');
+assert.equal(canSensor.address,null,'CAN sensors never receive a guessed address');
 const positionsBefore=JSON.stringify(assembled);
 const positioned={...assembled,...moveComponent({...assembled,checks:{mechanical:true}},'turretOne','motor:turretController',{x:10,y:-5})};
 assert.deepEqual(componentPosition(positioned,'turretOne','motor:turretController'),{x:.87,y:.14});

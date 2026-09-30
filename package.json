@@ -24,7 +24,8 @@
     "prebuild:pages": "node scripts/package-companion.mjs",
     "build:pages": "node scripts/build-pages.mjs",
     "preview:pages": "vite preview --config vite.pages.config.ts",
-    "test:pages": "node scripts/verify-pages.mjs"
+    "test:pages": "node scripts/verify-pages.mjs",
+    "test:can-addresses": "node scripts/verify-can-addresses.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -1,4 +1,5 @@
 "use client";
+import { canAddressLabel } from '@/lib/can-address';
 import type { Project } from '@/lib/robot-model';
 import { corners,cornerNames,driveTypes,driveType,isHolonomic,controlStyle,selectDrivetrain,type DriveType } from '@/lib/drivetrain';
 import { productById } from '@/lib/hardware-catalog';
@@ -8,7 +9,7 @@ function NumberField({label,value,onChange,min,max,step=.01}:{label:string;value
 function Choice({label,value,onChange,options}:{label:string;value:string;onChange:(v:string)=>void;options:{value:string;label:string}[]}){return <label className="form-field"><span>{label}</span><select aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{options.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></label>;}
 export function DrivetrainEditor({project:p,update,layoutOnly=false,settingsOnly=false}:Props & {layoutOnly?:boolean;settingsOnly?:boolean}){
  const type=driveType(p),holo=isHolonomic(p),motors=p.motors.filter(m=>m.subsystem==='drive');
- const options=(role:string)=>[{value:'',label:'Choose a motor…'},...motors.filter(m=>m.role===role).map(m=>({value:m.id,label:`${m.name} · ${m.type} · ${m.can}`}))];
+ const options=(role:string)=>[{value:'',label:'Choose a motor…'},...motors.filter(m=>m.role===role).map(m=>({value:m.id,label:`${m.name} · ${m.type} · ${canAddressLabel(m.can)}`}))];
  const encoders=[{value:'',label:'Choose an absolute encoder…'},...(p.devices||[]).filter(d=>d.subsystem==='drive'&&['cancoder','duty'].includes(productById(d.product)?.adapter||'')).map(d=>({value:d.id,label:d.name}))];
  const set=(patch:Partial<Project['drive']>)=>update({drive:{...p.drive,...patch}});
  if(settingsOnly&&!holo)return null;

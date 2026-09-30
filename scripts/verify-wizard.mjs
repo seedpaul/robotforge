@@ -7,6 +7,7 @@ const { initialProject, createDraft, parseProject, wizardProgress, readWizardPos
 
 const draft = createDraft();
 assert.equal(draft.motors.length, 0);
+assert.equal(draft.drive.gyroCan,null,'new drafts do not guess a Pigeon CAN ID');
 assert.equal(draft.commands.length, 0);
 assert.deepEqual(draft.subsystems.map(s=>s.id), ['drive']);
 assert.deepEqual(parseProject(JSON.stringify(draft)), draft, 'empty drafts save and reload');
@@ -27,7 +28,9 @@ assert.deepEqual(wizardProgress(expanded).subsystems.filter(s=>s.complete).map(s
 const motor = newMotor(expanded, 'SparkFlex', 'elevatorMotor', 'elevator');
 assert.equal(motor.subsystem, 'elevator');
 assert.equal(motor.role, 'mechanism');
-assert.ok(!base.motors.some(m=>m.can===motor.can), 'IDs remain unique across subsystems');
+assert.equal(motor.can,null,'CAN ID starts blank');
+assert.equal(wizardProgress({...expanded,motors:[...expanded.motors,motor]}).subsystems.at(-1).hardwareReady,false);
+motor.can=42;
 const wired = {...expanded, motors:[...expanded.motors,motor]};
 assert.equal(wizardProgress(wired).subsystems.at(-1).status, 'Add commands');
 const completed = {...wired,commands:[...wired.commands,{id:'raiseElevator',name:'Raise elevator',subsystem:'elevator',output:.2,timeout:1}]};

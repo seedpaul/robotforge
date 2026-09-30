@@ -1,3 +1,4 @@
+import { canAddressLabel } from './can-address';
 import type { Project } from './robot-model';
 import { componentCatalog } from './component-catalog';
 import { newDevice, productById } from './hardware-catalog';
@@ -8,13 +9,13 @@ export type ComponentProfile=typeof componentCatalog[number];
 const digital=['digital','digitalOut','duty','quadrature','ultrasonic'];
 const doubleDigital=['quadrature','ultrasonic'];
 const valves=['solenoidRev','solenoidCtre','doubleRev','doubleCtre'];
-const free=(used:Set<number>,max:number,label:string)=>{
+const free=(used:Set<number|null>,max:number,label:string)=>{
   const value=Array.from({length:max+1},(_,i)=>i).find(i=>!used.has(i));
   if(value===undefined)throw Error(`No free ${label}. Review your configured hardware first.`);
   return value;
 };
 
-/** Suggest unused connections across the entire robot, including other subsystems. */
+/** Suggest physical I/O ports across the robot; leave CAN addresses unset. */
 export function newProjectDevice(p:Project,product:string,id:string,subsystem:string) {
   const def=productById(product),ds=p.devices||[];
   if(!def)throw Error('Choose a component from the library.');
@@ -24,13 +25,6 @@ export function newProjectDevice(p:Project,product:string,id:string,subsystem:st
   let number=1;
   while(ds.some(x=>x.name===`${def.name} ${number}`))number++;
   d.name=`${def.name} ${number}`.slice(0,60);
-  if(def.connection==='CAN'){
-    const used=new Set(p.motors.filter(m=>!m.type.startsWith('PWM')&&(m.bus||'rio')==='rio').map(m=>m.can));
-    ds.filter(x=>x.bus==='rio'&&productById(x.product)?.connection==='CAN').forEach(x=>used.add(x.address));
-    if(p.drive.gyro==='Pigeon2'&&(p.drive.gyroBus||'rio')==='rio')used.add(p.drive.gyroCan);
-    // Prefer 1..62; ID 0 is valid when the remaining addresses are occupied.
-    d.address=Array.from({length:62},(_,i)=>i+1).find(n=>!used.has(n))??free(used,62,'CAN IDs on roboRIO CAN');
-  }
   if(digital.includes(a)){
     const used=new Set(p.motors.filter(m=>m.limit>=0).map(m=>m.limit));
     for(const x of ds){const adapter=productById(x.product)?.adapter||'';if(digital.includes(adapter))used.add(x.channel);if(doubleDigital.includes(adapter))used.add(x.channelB);}
@@ -62,8 +56,8 @@ export function newProjectDevice(p:Project,product:string,id:string,subsystem:st
 
 export function subsystemComponents(project:Project,subsystem:string) {
   return [
-    ...project.motors.filter(m=>m.subsystem===subsystem).map(m=>({key:'motor:'+m.id,id:m.id,name:m.name,profile:componentCatalog.find(c=>c.kind==='motor'&&c.type===m.type)!,connection:`${m.type.startsWith('PWM')?'PWM':'CAN'} ${m.can}`})),
-    ...(project.devices||[]).filter(d=>d.subsystem===subsystem).map(d=>{const profile=componentCatalog.find(c=>c.kind==='device'&&c.id===d.product)!;return {key:'device:'+d.id,id:d.id,name:d.name,profile,connection:profile?.connection==='CAN'?`CAN ${d.address}`:profile?.connection==='DIO × 2'?`DIO ${d.channel} / ${d.channelB}`:['DIO','PWM','Analog'].includes(profile?.connection)?`${profile.connection} ${d.channel}`:profile?.connection||'Unknown profile'};}),
+    ...project.motors.filter(m=>m.subsystem===subsystem).map(m=>({key:'motor:'+m.id,id:m.id,name:m.name,profile:componentCatalog.find(c=>c.kind==='motor'&&c.type===m.type)!,connection:m.type.startsWith('PWM')?`PWM ${m.can}`:canAddressLabel(m.can)})),
+    ...(project.devices||[]).filter(d=>d.subsystem===subsystem).map(d=>{const profile=componentCatalog.find(c=>c.kind==='device'&&c.id===d.product)!;return {key:'device:'+d.id,id:d.id,name:d.name,profile,connection:profile?.connection==='CAN'?canAddressLabel(d.address):profile?.connection==='DIO × 2'?`DIO ${d.channel} / ${d.channelB}`:['DIO','PWM','Analog'].includes(profile?.connection)?`${profile.connection} ${d.channel}`:profile?.connection||'Unknown profile'};}),
   ].filter(c=>!!c.profile);
 }
 

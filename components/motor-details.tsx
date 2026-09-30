@@ -1,4 +1,5 @@
 "use client";
+import CanIdInput from './can-id-input';
 import { Trash2 } from 'lucide-react';
 import type { Motor, Project } from '@/lib/robot-model';
 import { motorCatalog, motorKinds } from '@/lib/motor-catalog';
@@ -13,7 +14,7 @@ export default function MotorDetails({project,update,motor:m}:{project:Project;u
   const pwm=m.type.startsWith('PWM');
   return <div className="motor-details"><p className="device-guidance">{profile.description}</p><div className="form-grid two">
     <label className="form-field"><span>Component name</span><input aria-label="Component name" maxLength={60} value={m.name} onChange={e=>change({name:e.target.value})}/></label>
-    {number(pwm?'PWM channel':'CAN ID',m.can,0,pwm?19:62,can=>change({can}))}
+    {pwm?number('PWM channel',m.can??NaN,0,19,can=>change({can})):<label className="form-field"><span>CAN ID</span><CanIdInput label="CAN ID" value={m.can} onChange={can=>change({can})}/><small>Enter the ID configured on this controller (0–62).</small></label>}
     {pick('Motor model',m.motorKind||'default',motorKinds(m.type),motorKind=>change({motorKind:motorKind as Motor['motorKind']}))}
     {['TalonFX','TalonFXS'].includes(m.type)&&pick('CAN bus',m.bus||'rio',busOptions(project),bus=>change({bus}))}
     {m.subsystem==='drive'&&<>{pick('Drive role',m.role,motorRoles(project),role=>change({role:role as Motor['role']}))}{pick('Encoder direction',String(m.sensorSign),[{value:'1',label:'+1'},{value:'-1',label:'−1'}],sign=>change({sensorSign:Number(sign) as 1|-1}))}</>}

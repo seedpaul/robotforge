@@ -7,9 +7,9 @@ export function validateHardware(p:Project):Issue[]{
 
  const devices=p.devices||[];const buses=new Set(['rio']);
  for(const d of devices.filter(d=>productById(d.product)?.adapter==='canbus')){owner=d.subsystem;if(buses.has(d.bus))error(`CANivore bus names must be unique and cannot be rio (${d.name}).`);buses.add(d.bus);}
- const can=(bus:string,id:number,name:string,ctre=false)=>{if(!buses.has(bus))error(`${name}: add CANivore “${bus}” first.`);if(bus!=='rio'&&!ctre)error(`${name} must use roboRIO CAN; its API does not support CANivore.`);claim(`CAN ${bus}:${id}`,name);};
+ const can=(bus:string,id:number|null,name:string,ctre=false)=>{if(!buses.has(bus))error(`${name}: add CANivore “${bus}” first.`);if(bus!=='rio'&&!ctre)error(`${name} must use roboRIO CAN; its API does not support CANivore.`);if(id===null)error(`${name}: enter the actual CAN ID (0–62).`);else claim(`CAN ${bus}:${id}`,name);};
  for(const m of p.motors){owner=m.subsystem;
-  if(m.type.startsWith('PWM')){if(m.can>19)error(`${m.name}: PWM channel must be 0–19.`);claim(`PWM ${m.can}`,m.name);}else can(m.bus||'rio',m.can,m.name,['TalonFX','TalonFXS'].includes(m.type));
+  if(m.type.startsWith('PWM')){if(m.can===null||m.can>19)error(`${m.name}: PWM channel must be 0–19.`);else claim(`PWM ${m.can}`,m.name);}else can(m.bus||'rio',m.can,m.name,['TalonFX','TalonFXS'].includes(m.type));
   if(m.limit>=0)claim(`DIO ${m.limit}`,m.name+' forward limit');
   const allowed=m.type==='TalonFX'?['default','falcon']:m.type==='TalonFXS'?['default','minion','neo','brushed']:m.type==='ThriftyNova'?['default','neo','minion','brushed']:m.type.startsWith('Spark')?['default','brushed']:['default'];
   if(!allowed.includes(m.motorKind||'default'))error(m.name+': choose a motor model supported by this controller.');

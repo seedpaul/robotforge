@@ -97,12 +97,7 @@ export function compareProjects(before: Project, after: Project): DesignChange[]
   } catch { changes.push({ area: 'Libraries & updates', name: 'Library settings need attention', kind: 'changed', details: [] }); }
   return changes;
 }
-export type MechanismAddition = { name: string; controller: 'none' | 'SparkMax' | 'SparkFlex' | 'TalonFX'; can: number };
-export function nextCanId(p: Project) {
-  const used = new Set([...p.motors.filter(m => !m.type.startsWith('PWM') && (m.bus || 'rio') === 'rio').map(m => m.can), ...(p.devices || []).filter(d => d.bus === 'rio' && productById(d.product)?.connection === 'CAN').map(d => d.address), ...(p.drive.gyro === 'Pigeon2' && (p.drive.gyroBus || 'rio') === 'rio' ? [p.drive.gyroCan] : [])]);
-  for (let id = 1; id <= 62; id++) if (!used.has(id)) return id;
-  return -1;
-}
+export type MechanismAddition = { name: string; controller: 'none' | 'SparkMax' | 'SparkFlex' | 'TalonFX'; can: number|null };
 export function appendMechanism(project: Project, addition: MechanismAddition): Project {
   const p = projectSchema.parse(project), name = addition.name.trim();
   if (!name || name.length > 32) throw Error('Choose a mechanism name with 1–32 characters.');
@@ -111,8 +106,8 @@ export function appendMechanism(project: Project, addition: MechanismAddition): 
   let motors = p.motors, commands = p.commands;
   if (addition.controller !== 'none') {
     const id = addition.can;
-    if (!Number.isInteger(id) || id < 0 || id > 62) throw Error('Choose a CAN ID between 0 and 62.');
-    if (p.motors.some(m => !m.type.startsWith('PWM') && (m.bus || 'rio') === 'rio' && m.can === id) || (p.devices || []).some(d => d.bus === 'rio' && d.address === id && productById(d.product)?.connection === 'CAN') || p.drive.gyro === 'Pigeon2' && (p.drive.gyroBus || 'rio') === 'rio' && p.drive.gyroCan === id) throw Error('That CAN ID is already assigned on roboRIO CAN.');
+    if (id!==null && (!Number.isInteger(id) || id < 0 || id > 62)) throw Error('Choose a CAN ID between 0 and 62.');
+    if (id!==null && (p.motors.some(m => !m.type.startsWith('PWM') && (m.bus || 'rio') === 'rio' && m.can === id) || (p.devices || []).some(d => d.bus === 'rio' && d.address === id && productById(d.product)?.connection === 'CAN') || p.drive.gyro === 'Pigeon2' && (p.drive.gyroBus || 'rio') === 'rio' && p.drive.gyroCan === id)) throw Error('That CAN ID is already assigned on roboRIO CAN.');
     const motor: Motor = { id: 'motor_' + suffix, name: name + ' motor', type: addition.controller, can: id, bus: 'rio', motorKind: 'default', inverted: false, sensorSign: 1, current: 30, subsystem, role: 'mechanism', limit: -1 };
     motors = [...motors, motor]; commands = [...commands, { id: 'action_' + suffix, name: 'Run ' + name, subsystem, output: .2, timeout: 1 }];
   }

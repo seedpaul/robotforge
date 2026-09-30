@@ -30,11 +30,11 @@ async function finish() {
   for (let i = 0; i < 400; i++) { const { job } = await api('/status'); if (!['building','deploying'].includes(job.state)) return job; await new Promise(r=>setTimeout(r, 10)); }
   throw Error('Job did not finish');
 }
-const project = { ...structuredClone(initialProject), team: 9999, devices:[{...newDevice('quad','leftDistance','drive'),channel:0,channelB:1,scale:.01}], drive:{...initialProject.drive,tractionEncoders:{left:'leftDistance'}} };
+const project = { ...structuredClone(initialProject), team: 9999, devices:[{...newDevice('quad','leftDistance','drive'),channel:0,channelB:1,scale:.01}], drive:{...initialProject.drive,gyroCan:null,tractionEncoders:{left:'leftDistance'}} };
 const input = { project, connection: 'network', offline: false };
 const next = () => new Promise(r=>setTimeout(r, 1050));
 try {
-  assert.equal((await api('/status')).protocol, 6, 'older generators must not omit unit encoder assignments');
+  assert.equal((await api('/status')).protocol, 7, 'companion must support pending CAN addresses');
   assert.equal((await api('/status', null, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await api('/status', null, { Authorization: 'Bearer wrong' })).status, 401);
   const badHostStatus = await new Promise(resolve => { http.get(url + '/status', { headers: { ...headers, Host: 'rebind.example' } }, response => { response.resume(); resolve(response.statusCode); }); });
@@ -42,6 +42,7 @@ try {
   const preflight = await fetch(url + '/build', { method: 'OPTIONS', headers: { Origin: origin } });
   assert.equal(preflight.status, 204); assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
   assert.equal((await api('/build', { ...input, project: { ...project, team: 0 } })).status, 400);
+  for(const pending of [{...project,motors:project.motors.map((m,i)=>i===0?{...m,can:null}:m)}, {...project,devices:[...project.devices,newDevice('cancoder','pending','drive')]}, {...project,drive:{...project.drive,gyro:'Pigeon2',gyroCan:null}}])assert.equal((await api('/build',{...input,project:pending})).status,400,'unset CAN IDs must not reach build tools');
   assert.equal((await api('/build', { ...input, connection: "usb';exec('malicious')" })).status, 400);
   assert.equal((await api('/build', { ...input, project: { ...project, command: 'not allowed' } })).status, 400);
   for (const language of ['Java', 'C++', 'Python']) {

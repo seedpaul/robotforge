@@ -22,23 +22,20 @@ export const motorCatalog: MotorProfile[] = [
 ];
 export const motorOptions = motorCatalog.map(m => ({value:m.type, label:`${m.brand} ${m.name}${m.javaOnly?' · Java':''}`}));
 
-/** Allocate only within the selected connection, including other configured devices. */
+/** CAN addresses are entered by the team; PWM channels can be suggested from available ports. */
 export function newMotor(p: Project, type: Motor['type'], id: string, subsystemId?:string): Motor {
  const profile = motorCatalog.find(m => m.type === type);
  if (!profile) throw Error('Choose a supported motor controller.');
  if (p.motors.length >= 40) throw Error('This project supports up to 40 motor controllers.');
  if (profile.javaOnly && p.language !== 'Java') throw Error('Thrifty Nova currently requires a Java project.');
  const pwm = profile.connection === 'PWM';
- const used = new Set(p.motors.filter(m => pwm ? m.type.startsWith('PWM') : !m.type.startsWith('PWM') && (m.bus || 'rio') === 'rio').map(m => m.can));
- for (const device of p.devices || []) {
-  const product = productById(device.product);
-  if (pwm && product?.connection === 'PWM') used.add(device.channel);
-  if (!pwm && product?.connection === 'CAN' && device.bus === 'rio') used.add(device.address);
+ let address:number|null=null;
+ if(pwm){
+  const used=new Set(p.motors.filter(m=>m.type.startsWith('PWM')).map(m=>m.can));
+  for(const device of p.devices||[])if(productById(device.product)?.connection==='PWM')used.add(device.channel);
+  address=Array.from({length:20},(_,i)=>i).find(n=>!used.has(n))??null;
+  if(address===null)throw Error('No free PWM channels. Review your configured hardware first.');
  }
- if (!pwm && p.drive.gyro === 'Pigeon2' && (p.drive.gyroBus || 'rio') === 'rio') used.add(p.drive.gyroCan);
- const addresses = pwm ? Array.from({length:20},(_,i)=>i) : [...Array.from({length:62},(_,i)=>i+1),0];
- const address = addresses.find(n => !used.has(n));
- if (address === undefined) throw Error(pwm ? 'No free PWM channels. Review your configured hardware first.' : 'No free CAN IDs on roboRIO CAN. Review your configured hardware first.');
  const subsystem = subsystemId || p.subsystems.find(s => s.id !== 'drive')?.id || 'drive';
  if (!p.subsystems.some(s=>s.id===subsystem)) throw Error('Choose an existing subsystem first.');
  if (subsystem === 'drive' && !['SparkMax','SparkFlex','TalonFX'].includes(type) && !(type==='TalonFXS'&&driveType(p)==='swerve')) throw Error('Add a mechanism in Subsystems first. This controller does not support generated drivetrain odometry.');
