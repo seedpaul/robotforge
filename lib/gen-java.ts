@@ -53,6 +53,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPLTVController;
 public final class Drive extends SubsystemBase {
+  private final HardwareIO hardware;
   private final MotorIO[] left={${driveMotors('left')}};
   private final MotorIO[] right={${driveMotors('right')}};
   private final ${d.gyro==='Pigeon2'?`Pigeon2 gyro=new Pigeon2(${d.gyroCan},new com.ctre.phoenix6.CANBus(${q(d.gyroBus||'rio')}))`:d.gyro==='NavX'?`com.studica.frc.AHRS gyro=new com.studica.frc.AHRS(com.studica.frc.AHRS.NavXComType.${navxPort(d.navxInterface)})`:'ADXRS450_Gyro gyro=new ADXRS450_Gyro()'};
@@ -62,7 +63,8 @@ public final class Drive extends SubsystemBase {
   private final PIDController leftPID=new PIDController(${d.kP},0,0),rightPID=new PIDController(${d.kP},0,0);
   private final Field2d field=new Field2d();
   private double last=0; private boolean autoReady=false;
-  public Drive() {
+  public Drive(HardwareIO hardware) {
+    this.hardware=hardware;
     ${d.gyro==='ADXRS450'?'gyro.calibrate();':''}
     odometry=new DifferentialDriveOdometry(heading(),distance(left),distance(right));
     SmartDashboard.putData("Robot pose",field);
@@ -70,13 +72,14 @@ public final class Drive extends SubsystemBase {
     catch(Exception e) { DriverStation.reportError("Autonomous configuration failed: "+e.getMessage(),false); }
   }
   private Rotation2d heading() { return gyro.getRotation2d(); }
-  private double distance(MotorIO[] motors) { double sum=0;for(var m:motors)sum+=m.position();return motors.length==0?0:sum/motors.length*metersPerRotation; }
-  private double velocity(MotorIO[] motors) { double sum=0;for(var m:motors)sum+=m.velocity();return motors.length==0?0:sum/motors.length*metersPerRotation; }
+  private double distance(MotorIO[] motors) { ${(['left','right'] as const).filter(side=>d.tractionEncoders?.[side]).map(side=>`if(motors==${side})return hardware.read_${d.tractionEncoders![side]}();`).join('')}double sum=0;for(var m:motors)sum+=m.position();return motors.length==0?0:sum/motors.length*metersPerRotation; }
+  private double velocity(MotorIO[] motors) { ${(['left','right'] as const).filter(side=>d.tractionEncoders?.[side]).map(side=>`if(motors==${side})return hardware.rate_${d.tractionEncoders![side]}();`).join('')}double sum=0;for(var m:motors)sum+=m.velocity();return motors.length==0?0:sum/motors.length*metersPerRotation; }
+  private boolean feedbackHealthy(){return Double.isFinite(distance(left))&&Double.isFinite(distance(right))&&Double.isFinite(velocity(left))&&Double.isFinite(velocity(right));}
   public Pose2d pose() { return odometry.getPoseMeters(); }
-  public void resetPose(Pose2d pose) { odometry.resetPosition(heading(),distance(left),distance(right),pose);leftPID.reset();rightPID.reset(); }
+  public void resetPose(Pose2d pose) { if(!feedbackHealthy()){stop();return;}odometry.resetPosition(heading(),distance(left),distance(right),pose);leftPID.reset();rightPID.reset(); }
   public ChassisSpeeds speeds() { return kinematics.toChassisSpeeds(new DifferentialDriveWheelSpeeds(velocity(left),velocity(right))); }
   public boolean autoReady() { return autoReady; }
-  private void voltage(double l,double r) { last=Timer.getFPGATimestamp();for(var m:left)if(!m.ready())l=r=0;for(var m:right)if(!m.ready())l=r=0;for(var m:left)m.voltage(l);for(var m:right)m.voltage(r); }
+  private void voltage(double l,double r) { if(!feedbackHealthy())l=r=0;last=Timer.getFPGATimestamp();for(var m:left)if(!m.ready())l=r=0;for(var m:right)if(!m.ready())l=r=0;for(var m:left)m.voltage(l);for(var m:right)m.voltage(r); }
   public void stop() { voltage(0,0);leftPID.reset();rightPID.reset(); }
   public void arcade(double forward,double turn) {
     if(!DriverStation.isTeleopEnabled()) { stop();return; }
@@ -90,7 +93,7 @@ public final class Drive extends SubsystemBase {
   }
   @Override public void periodic() {
     if(DriverStation.isDisabled()||Timer.getFPGATimestamp()-last>0.1)stop();
-    odometry.update(heading(),distance(left),distance(right));field.setRobotPose(pose());
+    if(feedbackHealthy())odometry.update(heading(),distance(left),distance(right));else stop();field.setRobotPose(pose());
     SmartDashboard.putNumber("Drive/left meters",distance(left));SmartDashboard.putNumber("Drive/right meters",distance(right));SmartDashboard.putBoolean("Drive/auto configured",autoReady);
   }
 }
@@ -104,8 +107,8 @@ import edu.wpi.first.wpilibj2.command.button.Trigger;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.PathPlannerAuto;
 public final class RobotContainer {
-  private final Drive drive=new Drive();
   private final HardwareIO hardware=new HardwareIO();
+  private final Drive drive=new Drive(hardware);
   private final GenericHID driver=new GenericHID(${c.driverPort}),operator=new GenericHID(${c.operatorPort});
   ${mechanisms.map(s=>`private final Mechanism mechanism_${s.id}=new Mechanism(${q(s.name)}${p.motors.filter(m=>m.subsystem===s.id).map(m=>', '+motor(m)).join('')});`).join('\n  ')}
   private final SendableChooser<Command> chooser=new SendableChooser<>();

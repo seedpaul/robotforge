@@ -18,11 +18,11 @@ function ComponentIcon({profile}:{profile:ComponentProfile}) {
   return <Icon aria-hidden="true"/>;
 }
 type Drag={profile:ComponentProfile;key?:string;pointer:number;startX:number;startY:number;moved:boolean;point:LayoutPoint};
-type Props={project:Project;update:(patch:Partial<Project>)=>void;subsystemId:string;issues:Issue[];setTab:(tab:string)=>void};
+type Props={hideDriveSetup?:boolean;excludeKeys?:string[];title?:string;project:Project;update:(patch:Partial<Project>)=>void;subsystemId:string;issues:Issue[];setTab:(tab:string)=>void};
 
-export default function SubsystemDesigner({project,update,subsystemId,issues,setTab}:Props) {
+export default function SubsystemDesigner({project,update,subsystemId,issues,setTab,hideDriveSetup=false,excludeKeys=[],title}:Props) {
   const subsystem=project.subsystems.find(s=>s.id===subsystemId)!;
-  const parts=subsystemComponents(project,subsystemId);
+  const parts=subsystemComponents(project,subsystemId).filter(c=>!excludeKeys.includes(c.key));
   const board=useRef<HTMLDivElement>(null),tracking=useRef<Drag|null>(null);
   const [search,setSearch]=useState(''),[brand,setBrand]=useState('all'),[category,setCategory]=useState('all');
   const [armed,setArmed]=useState<ComponentProfile|null>(null),[drag,setDrag]=useState<Drag|null>(null),[selected,setSelected]=useState<string|null>(null),[message,setMessage]=useState('');
@@ -41,7 +41,7 @@ export default function SubsystemDesigner({project,update,subsystemId,issues,set
   const changeSubsystem=(patch:Partial<typeof subsystem>)=>update({subsystems:project.subsystems.map(s=>s.id===subsystemId?{...s,...patch}:s)});
   return <div className="view-stack subsystem-assembly">
     <section className="component-designer" aria-label={'Assemble '+subsystem.name}>
-      <div className="designer-heading"><div><h2>Assemble {subsystem.name}</h2><p>Drag hardware into this subsystem, then click a component to set it up.</p></div><span>{parts.length} {parts.length===1?'component':'components'}</span></div>
+      <div className="designer-heading"><div><h2>{title||'Assemble '+subsystem.name}</h2><p>Drag hardware into this subsystem, then click a component to set it up.</p></div><span>{parts.length} {parts.length===1?'component':'components'}</span></div>
       <div className="component-workspace">
         <aside className="component-tray" aria-label="Hardware parts tray"><h3>Component library</h3><label className="catalog-search"><Search size={16}/><input aria-label="Search hardware to place" placeholder="SPARK MAX, CANcoder…" value={search} onChange={e=>setSearch(e.target.value)}/></label>
           <label className="form-field"><span className="sr-only">Hardware category</span><select aria-label="Hardware category" value={category} onChange={e=>setCategory(e.target.value)}><option value="all">All components</option>{componentCategories.map(c=><option key={c}>{c}</option>)}</select></label>
@@ -62,7 +62,7 @@ export default function SubsystemDesigner({project,update,subsystemId,issues,set
         </div>
       </div><p id="component-keyboard-help" className="sr-only">Drag or use arrow keys to reposition. Press Enter to configure. To add with the keyboard, select a library item, then focus the workspace and press Enter.</p><div className="sr-only" aria-live="polite">{message}</div>
     </section>
-    {subsystemId==='drive'&&<details className="assembly-details" open><summary>Drivetrain geometry, wheel assignments & heading sensor</summary><Hardware project={project} update={update} issues={issues} setTab={setTab} tab="Build wizard" subsystemId="drive" hardwareStage="feedback"/></details>}
+    {subsystemId==='drive'&&!hideDriveSetup&&<details className="assembly-details" open><summary>Drivetrain geometry, wheel assignments & heading sensor</summary><Hardware project={project} update={update} issues={issues} setTab={setTab} tab="Build wizard" subsystemId="drive" hardwareStage="feedback"/></details>}
     <details className="assembly-details"><summary>Subsystem name & description</summary><div className="form-grid two"><label className="form-field"><span>Subsystem name</span><input aria-label="Subsystem name" maxLength={40} value={subsystem.name} onChange={e=>changeSubsystem({name:e.target.value})}/></label><label className="form-field"><span>What does it do?</span><input aria-label="Subsystem description" maxLength={200} value={subsystem.description} onChange={e=>changeSubsystem({description:e.target.value})}/></label></div></details>
     {!!findings.length&&<details className="assembly-details"><summary><CircleAlert size={17}/>{findings.length} hardware checks to review</summary><div className="assembly-findings">{findings.map((i,n)=><p key={n}>{i.message}</p>)}</div></details>}
     <Sheet open={!!current} onOpenChange={open=>{if(!open)setSelected(null);}}><SheetContent className="component-inspector" onCloseAutoFocus={e=>{e.preventDefault();if(current)document.getElementById('component-'+current.id)?.focus();}}><SheetHeader><SheetTitle>{current?.name||'Component settings'}</SheetTitle><SheetDescription>Set this component&apos;s connections and behavior in {subsystem.name}. Changes save as you work.</SheetDescription></SheetHeader>{current&&<div className="component-inspector-content">{current.profile.kind==='motor'?<MotorDetails project={project} update={update} motor={project.motors.find(m=>m.id===current.id)!}/>:<HardwareDevices key={current.id} project={project} update={update} mode="devices" hideLibrary selectedDeviceId={current.id} subsystemId={subsystemId} onAddMotor={()=>{}} motorEditor={()=>null}/>}<button className="button primary component-done" onClick={()=>setSelected(null)}>Done</button></div>}</SheetContent></Sheet>

@@ -18,3 +18,5 @@ export * from '../lib/build-wizard.ts';
 export * from '../lib/subsystem-layout.ts';
 
 export * from '../lib/component-layout.ts';
+
+export * from '../lib/drivetrain-assembly.ts';

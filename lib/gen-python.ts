@@ -19,8 +19,8 @@ class Robot(wpilib.TimedRobot):
     def robotInit(self):
         wpilib.DataLogManager.start()
         wpilib.DriverStation.startDataLog(wpilib.DataLogManager.getLog())
-        self.drive = Drive()
         self.hardware = HardwareIO()
+        self.drive = Drive(self.hardware)
         self.driver = wpilib.Joystick(CONFIG['controls']['driverPort'])
         self.operator = wpilib.Joystick(CONFIG['controls']['operatorPort'])
         self.mechanisms = {s['id']: Mechanism(s['name'], [MotorIO(m) for m in CONFIG['motors'] if m['subsystem'] == s['id']]) for s in CONFIG['subsystems'] if s['id'] != 'drive'}
@@ -144,8 +144,9 @@ from hardware import MotorIO
 from config import CONFIG
 
 class Drive(commands2.Subsystem):
-    def __init__(self):
+    def __init__(self, hardware):
         super().__init__()
+        self.hardware = hardware
         self.d = CONFIG['drive']
         self.left = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'left']
         self.right = [MotorIO(m) for m in CONFIG['motors'] if m['role'] == 'right']
@@ -171,15 +172,23 @@ class Drive(commands2.Subsystem):
         return self.gyro.getRotation2d() if self.d['gyro'] == 'ADXRS450' else self.gyro.getRotation2d()
 
     def distance(self, motors):
+        ${(['left','right'] as const).filter(side=>p.drive.tractionEncoders?.[side]).map(side=>`if motors is self.${side}: return self.hardware.read_${p.drive.tractionEncoders![side]}()`).join('\n        ')}
         return sum(m.position() for m in motors) / max(1, len(motors)) * self.meters_per_rotation
 
     def velocity(self, motors):
+        ${(['left','right'] as const).filter(side=>p.drive.tractionEncoders?.[side]).map(side=>`if motors is self.${side}: return self.hardware.rate_${p.drive.tractionEncoders![side]}()`).join('\n        ')}
         return sum(m.velocity() for m in motors) / max(1, len(motors)) * self.meters_per_rotation
+
+    def feedback_healthy(self):
+        return all(math.isfinite(v) for v in [self.distance(self.left), self.distance(self.right), self.velocity(self.left), self.velocity(self.right)])
 
     def pose(self):
         return self.odometry.getPose()
 
     def reset_pose(self, pose):
+        if not self.feedback_healthy():
+            self.stop()
+            return
         self.odometry.resetPosition(self.heading(), self.distance(self.left), self.distance(self.right), pose)
         self.left_pid.reset()
         self.right_pid.reset()
@@ -189,7 +198,7 @@ class Drive(commands2.Subsystem):
 
     def voltage(self, left, right):
         self.last = wpilib.Timer.getFPGATimestamp()
-        if not all(m.configured for m in self.left + self.right):
+        if not self.feedback_healthy() or not all(m.configured for m in self.left + self.right):
             left = right = 0.0
         for motor in self.left:
             motor.voltage(left)
@@ -221,7 +230,10 @@ class Drive(commands2.Subsystem):
     def periodic(self):
         if wpilib.DriverStation.isDisabled() or wpilib.Timer.getFPGATimestamp() - self.last > 0.1:
             self.stop()
-        self.odometry.update(self.heading(), self.distance(self.left), self.distance(self.right))
+        if self.feedback_healthy():
+            self.odometry.update(self.heading(), self.distance(self.left), self.distance(self.right))
+        else:
+            self.stop()
         self.field.setRobotPose(self.pose())
         wpilib.SmartDashboard.putNumber('Drive/left meters', self.distance(self.left))
         wpilib.SmartDashboard.putNumber('Drive/right meters', self.distance(self.right))

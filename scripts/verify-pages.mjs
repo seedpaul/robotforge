@@ -57,7 +57,7 @@ try {
     const response = await fetch(url + '/status', { headers: { Origin: origin, Authorization: `Bearer ${companion.token}` } });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('access-control-allow-origin'), origin);
-    assert.equal((await response.json()).version, '1.4.1');
+    assert.equal((await response.json()).version, '1.5.0');
   }
   assert.equal((await fetch(url + '/status', { headers: { Origin: 'https://seedpaul.github.io' } })).status, 401);
   for (const origin of ['https://someone-else.github.io', 'https://seedpaul.github.io.evil.example']) {

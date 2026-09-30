@@ -5,6 +5,7 @@ import type { Issue, Project } from '@/lib/robot-model';
 import { driveLabel, driveType } from '@/lib/drivetrain';
 import { hasChosenDrivetrain, wizardProgress, type SubsystemProgress, type WizardPosition, type WizardStep } from '@/lib/build-wizard';
 import { Commands, Subsystems } from './studio-views';
+import DrivetrainAssembly from './drivetrain-assembly';
 import SubsystemDesigner from './subsystem-designer';
 import DrivetrainPicker from './drivetrain-picker';
 import TeamNumberInput from './team-number-input';
@@ -88,7 +89,7 @@ export default function BuildWizard({ project, update, issues, setTab, saveStatu
         </div>:selected?<>
           <div className="wizard-subsystem-picker"><label className="form-field"><span>Working on subsystem</span><select aria-label="Working on subsystem" value={selected.id} onChange={e=>select(e.target.value)}>{progress.subsystems.map(s=><option key={s.id} value={s.id}>{s.name} · {step===2?(s.hardwareReady?'Hardware configured':'Needs hardware setup'):(s.complete?'Configured':s.status)}</option>)}</select></label><button className="text-button" onClick={()=>move(1)}><Plus size={15}/>Add a subsystem</button></div>
           {step===3&&<div className="wizard-subsystem-context"><span className="card-icon"><Zap size={22}/></span><div><h3>{selected.name}</h3><p>{selected.description || 'Build this subsystem at your own pace.'}</p><small>{selected.motors} motor controllers · {selected.devices} other components · {selected.id==='drive'?'Default drive command':`${selected.commands} commands`}</small></div><span className={'wizard-status '+(selected.complete?'complete':'')}>{selected.status}</span></div>}
-          {step===2?<SubsystemDesigner key={selected.id} project={project} update={update} issues={issues} setTab={setTab} subsystemId={selected.id}/>:<div className="view-stack">
+          {step===2?selected.id==='drive'?<DrivetrainAssembly project={project} update={update} issues={issues} setTab={setTab}/>:<SubsystemDesigner key={selected.id} project={project} update={update} issues={issues} setTab={setTab} subsystemId={selected.id}/>:<div className="view-stack">
             {!selected.hardwareReady&&<div className="wizard-callout"><Cable size={20}/><div><b>This subsystem still needs hardware setup.</b><p>Add or fix its components so commands can use them.</p></div><button className="button" onClick={()=>move(2)}>Set up hardware</button></div>}
             {selected.id==='drive'?<>
               <section className="panel"><div className="panel-title"><div><h2>Driving is your default command</h2><p>The generated drivetrain command runs whenever no autonomous path is using it. Set how your driver controls it below.</p></div><Gamepad2 size={24}/></div><div className="form-grid two">

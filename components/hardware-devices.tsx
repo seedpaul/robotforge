@@ -6,6 +6,7 @@ import { Accordion,AccordionItem,AccordionTrigger,AccordionContent } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { productById,isActuator,isSensor,type Device } from '@/lib/hardware-catalog';
 import { componentCatalog,componentBrands,componentCategories,filterComponents } from '@/lib/component-catalog';
+import { activeTractionEncoders } from '@/lib/drivetrain';
 import { newProjectDevice } from '@/lib/component-layout';
 import { motorCatalog } from '@/lib/motor-catalog';
 import { uid,type Motor,type Project } from '@/lib/robot-model';
@@ -34,7 +35,7 @@ export default function HardwareDevices({project:p,update,onAddMotor,motorEditor
  {['digital','digitalOut','duty','quadrature','ultrasonic','analog','analogEncoder','servo','blinkin','servoHub'].includes(a)&&number('channel',a==='servoHub'?'Servo Hub channel':def.connection==='Analog'?'Analog channel':def.connection==='PWM'?'PWM channel':a==='ultrasonic'?'Ping DIO channel':'DIO channel',0,a==='servoHub'?5:def.connection==='Analog'?7:def.connection==='PWM'?19:25)}
  {['quadrature','ultrasonic'].includes(a)&&number('channelB',a==='ultrasonic'?'Echo DIO channel':'Encoder B DIO channel',0,25)}
  {valve&&<><Pick label={'Pneumatic module '+d.name} value={d.module||'unassigned'} values={[{value:'unassigned',label:'Select a module'},...ds.filter(h=>productById(h.product)?.adapter===(a.endsWith('Rev')?'ph':'pcm')).map(h=>({value:h.id,label:h.name+` · CAN ${h.address}`}))]} onChange={v=>change(d.id,{module:v==='unassigned'?'':v})}/>{number('channel','Forward / single channel',0,a.endsWith('Rev')?15:7)}{a.startsWith('double')&&number('channelB','Reverse channel',0,a.endsWith('Rev')?15:7)}</>}
- {['duty','quadrature','analog','analogEncoder','cancoder','canrange','pigeon','navx','tof','encoderLegacy','pigeonLegacy'].includes(a)&&<>{number('scale',a==='quadrature'?'Distance per decoded count':'Scale',.0000001,10000,.001)}{number('offset','Zero offset',-10000,10000,.001)}</>}
+ {['duty','quadrature','analog','analogEncoder','cancoder','canrange','pigeon','navx','tof','encoderLegacy','pigeonLegacy'].includes(a)&&<>{number('scale',a==='quadrature'?(activeTractionEncoders(p).some(e=>e.id===d.id)?'Distance per pulse (m)':'Distance per full encoder pulse'):'Scale',.0000001,10000,.001)}{number('offset','Zero offset',-10000,10000,.001)}</>}
  {['digital','duty','quadrature','analog','analogEncoder','cancoder'].includes(a)&&<label className="switch-label"><Switch aria-label={'Invert sensor '+d.name} checked={d.inverted} onCheckedChange={inverted=>change(d.id,{inverted})}/>{a==='digital'?'Active-high input':'Reverse sensor direction'}</label>}
  {['color','navx'].includes(a)&&<Pick label={'Connection '+d.name} value={d.interface} values={a==='color'?[{value:'onboard',label:'roboRIO onboard I2C'},{value:'mxp',label:'MXP I2C'}]:[{value:'mxp',label:'MXP SPI'},{value:'onboard',label:'I2C'},{value:'usb1',label:'USB 1'},{value:'usb2',label:'USB 2'}]} onChange={v=>change(d.id,{interface:v as Device['interface']})}/>}
  {['ph','pcm'].includes(a)&&<label className="switch-label"><Switch aria-label={'Enable compressor '+d.name} checked={d.compressor} onCheckedChange={compressor=>change(d.id,{compressor})}/>Enable compressor with pressure switch while robot enabled</label>}

@@ -128,6 +128,7 @@ function fragment(d:Device,p:Project):Fragment{
 const indent=(s:string,n=8)=>s.split('\n').filter(x=>x.trim()).map(x=>' '.repeat(n)+x).join('\n');
 export function deviceSources(p:Project):Record<string,string>{
  const ds=(p.devices||[]).filter(d=>!['passive','custom'].includes(productById(d.product)?.adapter||'custom'));const fs=ds.map(d=>({d,f:fragment(d,p)}));const actuators=fs.filter(x=>isActuator(productById(x.d.product)!.adapter));const compressors=fs.filter(x=>['ph','pcm'].includes(productById(x.d.product)!.adapter));
+ const quadrature=ds.filter(d=>productById(d.product)?.adapter==='quadrature');
  const java=`package frc.robot;
 import edu.wpi.first.wpilibj.*;
 import edu.wpi.first.wpilibj.motorcontrol.*;
@@ -140,6 +141,7 @@ ${actuators.map(({d})=>`private double last_${d.id}=-100;`).join('\n')}
 public HardwareIO(){${fs.map(x=>x.f.init[0]).join('\n')}stopAll();}
 public void stopAll(){${actuators.map(({d})=>`stop_${d.id}();`).join('')}${compressors.map(x=>x.f.stop[0]).join('')}}
 ${fs.map(({d,f})=>`public double read_${d.id}(){return ${f.read[0]};}`).join('\n')}
+${quadrature.map(d=>`public double rate_${d.id}(){return d_${d.id}.getRate();}`).join('\n')}
 ${actuators.map(({d,f})=>`public void set_${d.id}(double value){if(!DriverStation.isEnabled()||!Double.isFinite(value)){stop_${d.id}();return;}last_${d.id}=Timer.getFPGATimestamp();${f.set[0]}}\npublic void stop_${d.id}(){${f.stop[0]}}`).join('\n')}
 @Override public void periodic(){
 ${actuators.map(({d})=>`if(DriverStation.isDisabled()||Timer.getFPGATimestamp()-last_${d.id}>0.1)stop_${d.id}();`).join('\n')}
@@ -164,6 +166,7 @@ public:
 HardwareIO(){${fs.map(x=>x.f.init[1]).join('\n')}StopAll();}
 void StopAll(){${actuators.map(({d})=>`stop_${d.id}();`).join('')}${compressors.map(x=>x.f.stop[1]).join('')}}
 ${fs.map(({d,f})=>`double read_${d.id}(){return ${f.read[1]};}`).join('\n')}
+${quadrature.map(d=>`double rate_${d.id}(){return d_${d.id}.GetRate();}`).join('\n')}
 ${actuators.map(({d,f})=>`void set_${d.id}(double value){if(!frc::DriverStation::IsEnabled()||!std::isfinite(value)){stop_${d.id}();return;}last_${d.id}=frc::Timer::GetFPGATimestamp().value();${f.set[1]}}\nvoid stop_${d.id}(){${f.stop[1]}}`).join('\n')}
 void Periodic() override {
 ${actuators.map(({d})=>`if(frc::DriverStation::IsDisabled()||frc::Timer::GetFPGATimestamp().value()-last_${d.id}>0.1)stop_${d.id}();`).join('\n')}
@@ -196,6 +199,7 @@ ${fs.map(x=>indent(x.f.init[2])).join('\n')}
 ${actuators.length?actuators.map(({d})=>`        self.stop_${d.id}()`).join('\n'):'        pass'}
 ${compressors.map(x=>indent(x.f.stop[2])).join('\n')}
 ${fs.map(({d,f})=>`\n    def read_${d.id}(self):\n        return ${f.read[2]}`).join('\n')}
+${quadrature.map(d=>`\n    def rate_${d.id}(self):\n        return self.d_${d.id}.getRate()`).join('\n')}
 ${actuators.map(({d,f})=>`\n    def set_${d.id}(self, value):\n        if not wpilib.DriverStation.isEnabled() or not math.isfinite(value):\n            self.stop_${d.id}()\n            return\n        self.last_${d.id} = wpilib.Timer.getFPGATimestamp()\n${indent(f.set[2])}\n\n    def stop_${d.id}(self):\n${indent(f.stop[2])}`).join('\n')}
 
     def periodic(self):

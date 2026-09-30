@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 const bundle=await rolldown({input:'scripts/library-test-entry.mjs',platform:'node',external:[/^node:/]});
 await bundle.write({file:'.verification/drivetrain-test.mjs',format:'esm'});await bundle.close();
-const {initialProject,selectDrivetrain,driveTypes,controlStyle,corners,newDevice,validate,parseProject,assembleProject}=await import('../.verification/drivetrain-test.mjs');
+const {initialProject,selectDrivetrain,driveTypes,controlStyle,corners,newDevice,validate,parseProject,assembleProject,drivetrainUnits,addDriveComponent,assignDriveComponent,existingDriveOptions,compatibleDriveProfile,captureCheckpoint,restoreCheckpoint}=await import('../.verification/drivetrain-test.mjs');
 const base=()=>({...structuredClone(initialProject),team:9999});
 const errors=p=>validate(p).filter(i=>i.level==='error');
 const fixture=type=>{
@@ -53,4 +53,59 @@ for(const type of driveTypes.map(t=>t.value))for(const language of ['Java','C++'
   for(const [name,value] of Object.entries(files)){const target=dir+'/'+name;await fs.mkdir(target.slice(0,target.lastIndexOf('/')),{recursive:true});await fs.writeFile(target,value);}
  }
 }
-console.log('PASS: 15 drivetrain/language exports, legacy backups, hardware preservation, motor counts, module mapping, sensor units, axis collisions and invalid-export blocking.');
+// Build actual projects through the same physical-unit operations used by the wizard.
+const unitFixture=type=>{
+ let p=base();p.motors=p.motors.filter(m=>m.subsystem!=='drive');p.devices=[];p={...p,...selectDrivetrain(p,type)};
+ const untouched=JSON.stringify(p),original=p;
+ assert.equal(drivetrainUnits(p).length,['swerve','mecanum'].includes(type)?4:2);
+ for(const unit of drivetrainUnits(p)){
+  assert.equal(unit.complete,false);
+  p={...p,...addDriveComponent(p,unit.id,'drive','motor-SparkMax','drive_'+unit.id)};
+  if(type==='swerve'){
+   p={...p,...addDriveComponent(p,unit.id,'steer','motor-TalonFXS','steer_'+unit.id)};
+   p={...p,...addDriveComponent(p,unit.id,'encoder','cancoder','encoder_'+unit.id)};
+  }else{
+   p={...p,...addDriveComponent(p,unit.id,'encoder','quad','encoder_'+unit.id)};
+   if(unit.kind==='side')p={...p,...addDriveComponent(p,unit.id,'drive','motor-SparkMax','second_'+unit.id)};
+  }
+ }
+ assert.equal(JSON.stringify(original),untouched,'assembly must not mutate prior project/checkpoint');
+ assert.ok(drivetrainUnits(p).every(u=>u.complete));
+ assert.deepEqual(errors(p),[],type+' unit assembly');
+ assert.deepEqual(p.commands,initialProject.commands);assert.deepEqual(p.bindings,initialProject.bindings);
+ assert.deepEqual(parseProject(JSON.stringify(p)),p);
+ const restored=restoreCheckpoint(captureCheckpoint(p,'Unit assembly','All corners'));
+ assert.deepEqual(restored.drive,p.drive,'checkpoint preserves physical assignments');
+ assert.throws(()=>addDriveComponent(p,drivetrainUnits(p)[0].id,'encoder',type==='swerve'?'cancoder':'quad','duplicate'),/filled/);
+ assert.throws(()=>assignDriveComponent(p,drivetrainUnits(p)[1].id,'encoder',drivetrainUnits(p)[0].encoder.id),/another drive unit/);
+ return p;
+};
+for(const type of driveTypes.map(t=>t.value))unitFixture(type);
+let swerve=unitFixture('swerve');
+assert.throws(()=>assignDriveComponent(swerve,'frontLeft','steer','drive_frontLeft'),/separate motors/);
+swerve={...swerve,...assignDriveComponent(swerve,'frontLeft','drive','')};
+assert.ok(existingDriveOptions(swerve,'drive').some(o=>o.id==='drive_frontLeft'));
+swerve={...swerve,...assignDriveComponent(swerve,'frontLeft','drive','drive_frontLeft')};
+assert.ok(drivetrainUnits(swerve)[0].complete);
+assert.equal(compatibleDriveProfile(swerve,'quad','encoder'),false);
+assert.equal(compatibleDriveProfile(swerve,'motor-TalonFXS','drive'),false);
+assert.equal(compatibleDriveProfile(swerve,'motor-TalonFXS','steer'),true);
+let tank=unitFixture('tank');const motorCount=tank.motors.length;
+tank={...tank,...assignDriveComponent(tank,'right','drive','drive_left')};
+assert.equal(tank.motors.length,motorCount);assert.equal(drivetrainUnits(tank)[1].motors.length,3);
+tank={...tank,...addDriveComponent(tank,'right','drive','motor-SparkMax','fourthRight')};
+assert.throws(()=>addDriveComponent(tank,'right','drive','motor-SparkMax','fifthRight'),/four motors/);
+assert.equal(compatibleDriveProfile(tank,'cancoder','encoder'),false);
+for(const change of [p=>p.drive.tractionEncoders.left='missing',p=>p.drive.tractionEncoders.right=p.drive.tractionEncoders.left,p=>p.devices[0].subsystem='intake',p=>p.devices[0].product='duty']){
+ const p=unitFixture('differential');change(p);assert.ok(errors(p).length);await assert.rejects(()=>assembleProject(p,assets));
+}
+for(const type of ['differential','mecanum'])for(const language of ['Java','C++','Python']){
+ const p=unitFixture(type);p.language=language;
+ p.devices.forEach(d=>{d.scale=.01;d.offset=.25;});
+ const files=await assembleProject(p,assets),sources=Object.entries(files).filter(([n])=>/\.(java|cpp|py)$/.test(n)).map(([,v])=>v).join('\n');
+ const keys=type==='mecanum'?corners:['left','right'];
+ for(const key of keys){assert.match(sources,new RegExp('read_encoder_'+key));assert.match(sources,new RegExp('rate_encoder_'+key));}
+ const dir='.verification/units-'+type+'-'+(language==='C++'?'cpp':language.toLowerCase());
+ for(const [name,value] of Object.entries(files)){const target=dir+'/'+name;await fs.mkdir(target.slice(0,target.lastIndexOf('/')),{recursive:true});await fs.writeFile(target,value);}
+}
+console.log('PASS: 21 drivetrain/language exports; physical module/side/wheel assembly, unique assignments, incremental hardware reuse, optional encoder validation/feedback, checkpoint round trips, legacy backups, invalid-export blocking.');

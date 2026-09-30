@@ -1,4 +1,4 @@
-# RobotForge Companion 1.4.1
+# RobotForge Companion 1.5.0
 
 This companion lets the RobotForge web app build Java/C++/Python projects locally and deploy them to your FRC roboRIO using GradleRIO or RobotPy. It only accepts validated RobotForge configurations, not arbitrary source uploads or shell commands.
 
@@ -17,7 +17,7 @@ The companion does not control Driver Station or enable the robot. It cannot ind
 
 ## At events / offline
 
-Companion 1.4.1 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
+Companion 1.5.0 honors **Libraries & updates**. Automatic online builds check stable 2026 releases from official publishers. Frozen projects and cached/offline builds keep the selected versions. The resolved versions appear in the build log and in `robotforge-libraries.lock.json`; deployment never checks for or applies another update after that build. New seasons and previews are excluded. Python environments are isolated by the exact requirement list. Extra PWF, navX, and PhotonVision packages are installed when enabled in the project; writing their device integration code is a separate task.
 
 Complete an online build on this laptop for each language you plan to use before the event. **Use cached dependencies** skips network preparation; it fails if the required dependencies have not been cached. Java/C++ uploads always run Gradle offline. Python uploads use the requirements downloaded by RobotPy sync. Changing connection or configuration requires a new build. Build cancellation is available; upload cancellation is deliberately unavailable because interrupting a transfer may leave the roboRIO in an incomplete state. The 20-minute operation timeout still applies.
 
@@ -47,6 +47,6 @@ Builds remain in `~/.robotforge/builds` for review; the companion does not delet
 
 The application and companion are software-tested, including generator output and build behavior. Physical roboRIO upload and browser/OS combinations still require on-hardware acceptance testing. There is no claim of automatic competition readiness.
 
-Companion 1.4.1 adds differential/West Coast/tank, mecanum, and four-module swerve generation. Download this release before using the new drivetrain settings. The browser requires protocol 5 so older companions cannot silently generate a different drive layout.
+Companion 1.5.0 supports the physical drivetrain assembly wizard and optional external quadrature distance/speed feedback for differential/West Coast/tank sides and mecanum wheels. Four-module swerve continues to use each module's absolute steering encoder. The browser requires protocol 6 so older companions cannot silently omit external encoder assignments. Download this release before building from the current app.
 
 GitHub Pages shares an origin across the account’s project sites. Only run trusted sites on that account. Pairing still requires the current code and every deployment requires explicit confirmation; no wildcard origins are allowed.

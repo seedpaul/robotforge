@@ -3,6 +3,8 @@ import { orderedModules,driveType } from './drivetrain';
 import { navxPort } from './gen-devices';
 export function pythonHolonomicDrive(p:Project){
  const d=p.drive,s=driveType(p)==='swerve',mods=orderedModules(p),corners=['frontLeft','frontRight','backLeft','backRight'] as const;
+ const encoders=s?[]:corners.flatMap((c,i)=>d.tractionEncoders?.[c]?[{i,id:d.tractionEncoders[c]!}]:[]);
+ const feedback=(method:'read'|'rate',fallback:string)=>encoders.reduceRight((value,e)=>`(self.hardware.${method}_${e.id}() if i==${e.i} else ${value})`,fallback);
  const locations=corners.map((_,i)=>`Translation2d(${(i<2?1:-1)*(d.wheelbase??.6)/2},${(i%2===0?1:-1)*d.trackWidth/2})`).join(',');
  const start=p.auto.waypoints[0],end=p.auto.waypoints.at(-1)!,heading=Math.atan2(p.auto.waypoints[1].y-start.y,p.auto.waypoints[1].x-start.x),last=p.auto.waypoints.at(-2)!,endHeading=Math.atan2(end.y-last.y,end.x-last.x);
  return `import math
@@ -66,12 +68,13 @@ class Drive(commands2.Subsystem):
         for i, reading in enumerate(readings):
             if math.isfinite(reading): self.angles[i] = Rotation2d.fromRotations(reading)
             else: ok = False`:''}
+        ${encoders.map(e=>`ok = ok and math.isfinite(self.hardware.read_${e.id}()) and math.isfinite(self.hardware.rate_${e.id}())`).join('\n        ')}
         return ok
     def distance(self, i):
-        value = self.wheels[i].position()*self.conversion
+        value = ${feedback('read','self.wheels[i].position()*self.conversion')}
         return value if math.isfinite(value) else 0
     def velocity(self, i):
-        value = self.wheels[i].velocity()*self.conversion
+        value = ${feedback('rate','self.wheels[i].velocity()*self.conversion')}
         return value if math.isfinite(value) else 0
     def positions(self): return ${s?'tuple(SwerveModulePosition(self.distance(i),self.angles[i]) for i in range(4))':'self.wheel_positions()'}
     ${s?'':`def wheel_positions(self):

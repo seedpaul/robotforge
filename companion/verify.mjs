@@ -5,6 +5,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { createCompanion, targetFor } from './server.mjs';
 import { initialProject } from '../lib/robot-model.ts';
+import { newDevice } from '../lib/hardware-catalog.ts';
 import { bundledLock } from '../lib/library-project.ts';
 const assets = JSON.parse(await fs.readFile('.verification/companion/assets.json', 'utf8'));
 const origin = 'http://127.0.0.1:3107';
@@ -29,11 +30,11 @@ async function finish() {
   for (let i = 0; i < 400; i++) { const { job } = await api('/status'); if (!['building','deploying'].includes(job.state)) return job; await new Promise(r=>setTimeout(r, 10)); }
   throw Error('Job did not finish');
 }
-const project = { ...structuredClone(initialProject), team: 9999 };
+const project = { ...structuredClone(initialProject), team: 9999, devices:[{...newDevice('quad','leftDistance','drive'),channel:0,channelB:1,scale:.01}], drive:{...initialProject.drive,tractionEncoders:{left:'leftDistance'}} };
 const input = { project, connection: 'network', offline: false };
 const next = () => new Promise(r=>setTimeout(r, 1050));
 try {
-  assert.equal((await api('/status')).protocol, 5, 'older drivetrain generators must be rejected by the browser');
+  assert.equal((await api('/status')).protocol, 6, 'older generators must not omit unit encoder assignments');
   assert.equal((await api('/status', null, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await api('/status', null, { Authorization: 'Bearer wrong' })).status, 401);
   const badHostStatus = await new Promise(resolve => { http.get(url + '/status', { headers: { ...headers, Host: 'rebind.example' } }, response => { response.resume(); resolve(response.statusCode); }); });
@@ -48,6 +49,9 @@ try {
     const config = { ...input, project: { ...project, language } };
     assert.equal((await api('/build', config)).status, 202);
     let job = await finish(); assert.equal(job.state, 'ready');
+    const driveFile = language==='Java'?'src/main/java/frc/robot/Drive.java':language==='C++'?'src/main/cpp/Robot.cpp':'drive.py';
+    const generatedDrive = await fs.readFile(path.join(root,'builds',job.id,driveFile),'utf8');
+    assert.match(generatedDrive,/read_leftDistance/);assert.match(generatedDrive,/rate_leftDistance/);
     assert.ok(!calls.some(c=>c.args.includes('deploy')), 'Build must never upload');
     assert.equal((await api('/deploy', { ...config, id: job.id, confirmTeam: '1', disabled: true })).status, 400);
     assert.equal((await api('/deploy', { ...config, id: job.id, confirmTeam: '9999', disabled: false })).status, 400);

@@ -6,6 +6,8 @@ export const javaMotorConstructor=(m:Motor)=>`new MotorIO(${q(m.type)},${m.can},
 export function javaHolonomicDrive(p:Project){
  const d=p.drive,s=driveType(p)==='swerve',mods=orderedModules(p),corners=['frontLeft','frontRight','backLeft','backRight'] as const;
  const motor=(id:string)=>javaMotorConstructor(p.motors.find(m=>m.id===id)!);
+ const encoders=s?[]:corners.flatMap((c,i)=>d.tractionEncoders?.[c]?[{i,id:d.tractionEncoders[c]!}]:[]);
+ const feedback=(method:'read'|'rate',fallback:string)=>encoders.reduceRight((value,e)=>`(i==${e.i}?hardware.${method}_${e.id}():${value})`,fallback);
  const locations=corners.map((_,i)=>`new Translation2d(${(i<2?1:-1)*(d.wheelbase??.6)/2},${(i%2===0?1:-1)*d.trackWidth/2})`).join(',');
  const start=p.auto.waypoints[0],end=p.auto.waypoints.at(-1)!,heading=Math.atan2(p.auto.waypoints[1].y-start.y,p.auto.waypoints[1].x-start.x),last=p.auto.waypoints.at(-2)!,endHeading=Math.atan2(end.y-last.y,end.x-last.x);
  return `package frc.robot;
@@ -24,9 +26,9 @@ import com.pathplanner.lib.config.*;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 /** Wheel order is always front-left, front-right, back-left, back-right. */
 public final class Drive extends SubsystemBase {
+ private final HardwareIO hardware;
  private final MotorIO[] wheels={${(s?mods.map(m=>m.driveMotor):corners.map(c=>d.wheels![c])).map(motor).join(',')}};
  ${s?`private final MotorIO[] steer={${mods.map(m=>motor(m.steerMotor)).join(',')}};
- private final HardwareIO hardware;
  private final PIDController[] steering={${mods.map(()=>`new PIDController(${d.steerKP??4},0,0)`).join(',')}};
  private final Rotation2d[] angles={new Rotation2d(),new Rotation2d(),new Rotation2d(),new Rotation2d()};`:''}
  private final PIDController[] velocityPID={${corners.map(()=>`new PIDController(${d.kP},0,0)`).join(',')}};
@@ -40,7 +42,8 @@ public final class Drive extends SubsystemBase {
  private final ProfiledPIDController theta=new ProfiledPIDController(${d.rotationKP??3},0,0,new TrapezoidProfile.Constraints(${d.maxAngularSpeed??4},${d.maxAngularSpeed??4}));
  private final HolonomicDriveController follower=new HolonomicDriveController(new PIDController(${d.translationKP??3},0,0),new PIDController(${d.translationKP??3},0,0),theta);`}
  public Drive(HardwareIO hardware) {
-  ${s?'this.hardware=hardware;for(var pid:steering)pid.enableContinuousInput(-Math.PI,Math.PI);':'theta.enableContinuousInput(-Math.PI,Math.PI);'}
+  this.hardware=hardware;
+  ${s?'for(var pid:steering)pid.enableContinuousInput(-Math.PI,Math.PI);':'theta.enableContinuousInput(-Math.PI,Math.PI);'}
   ${d.gyro==='ADXRS450'?'if(RobotBase.isReal())gyro.calibrate();':''}
   healthy();odometry=new ${s?'SwerveDriveOdometry':'MecanumDriveOdometry'}(kinematics,heading(),positions());
   SmartDashboard.putData("Robot pose",field);
@@ -51,10 +54,11 @@ public final class Drive extends SubsystemBase {
  private boolean healthy(){boolean ok=${d.gyro==='Pigeon2'?'gyro.getYaw().getStatus().isOK() && gyro.getYaw().getTimestamp().getLatency()<0.25':d.gyro==='NavX'?'gyro.isConnected()&&!gyro.isCalibrating()':'gyro.isConnected()'}&&Double.isFinite(heading().getRadians());
   for(var m:wheels)ok&=m.ready()&&Double.isFinite(m.position())&&Double.isFinite(m.velocity());
   ${s?`for(var m:steer)ok&=m.ready();double[] readings={${mods.map(m=>`hardware.read_${m.encoder}()-(${m.offset})`).join(',')}};for(int i=0;i<4;i++){ok&=Double.isFinite(readings[i]);if(Double.isFinite(readings[i]))angles[i]=Rotation2d.fromRotations(readings[i]);}`:''}
+  ${encoders.map(e=>`ok&=Double.isFinite(hardware.read_${e.id}())&&Double.isFinite(hardware.rate_${e.id}());`).join('')}
   return ok;
  }
- private double distance(int i){double value=wheels[i].position()*conversion;return Double.isFinite(value)?value:0;}
- private double velocity(int i){double value=wheels[i].velocity()*conversion;return Double.isFinite(value)?value:0;}
+ private double distance(int i){double value=${feedback('read','wheels[i].position()*conversion')};return Double.isFinite(value)?value:0;}
+ private double velocity(int i){double value=${feedback('rate','wheels[i].velocity()*conversion')};return Double.isFinite(value)?value:0;}
  private ${s?'SwerveModulePosition[]':'MecanumDriveWheelPositions'} positions(){return ${s?'new SwerveModulePosition[]{'+corners.map((_,i)=>`new SwerveModulePosition(distance(${i}),angles[${i}])`).join(',')+'}':'new MecanumDriveWheelPositions(distance(0),distance(1),distance(2),distance(3))'};}
  public Pose2d pose(){return odometry.getPoseMeters();}
  public void resetPose(Pose2d pose){if(!healthy()){stop();return;}odometry.resetPosition(heading(),positions(),pose);for(var pid:velocityPID)pid.reset();}

@@ -57,6 +57,7 @@ public:
   void Periodic() override {if(frc::DriverStation::IsDisabled()||frc::Timer::GetFPGATimestamp().value()-last>0.1)Stop();}
 };
 class Drive:public frc2::SubsystemBase {
+  HardwareIO& hardware;
   Motors left{${side('left')}},right{${side('right')}};
   ${d.gyro==='Pigeon2'?`ctre::phoenix6::hardware::Pigeon2 gyro{${d.gyroCan},ctre::phoenix6::CANBus{${q(d.gyroBus||'rio')}}};`:d.gyro==='NavX'?`studica::AHRS gyro{studica::AHRS::NavXComType::${navxPort(d.navxInterface)}};`:'frc::ADXRS450_Gyro gyro;'}
   double conversion=3.141592653589793*${d.wheelDiameter}/${d.gearing};
@@ -64,29 +65,30 @@ class Drive:public frc2::SubsystemBase {
   frc::DifferentialDriveOdometry odometry{gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)}};
   frc::PIDController leftPID{${d.kP},0,0},rightPID{${d.kP},0,0};
   frc::Field2d field;double last=0;
-  double Distance(const Motors& motors){double sum=0;for(auto&m:motors)sum+=m->Position();return motors.empty()?0:sum/motors.size()*conversion;}
-  double Velocity(const Motors& motors){double sum=0;for(auto&m:motors)sum+=m->Velocity();return motors.empty()?0:sum/motors.size()*conversion;}
-  void Voltage(double l,double r){last=frc::Timer::GetFPGATimestamp().value();for(auto&m:left)if(!m->Ready())l=r=0;for(auto&m:right)if(!m->Ready())l=r=0;for(auto&m:left)m->Voltage(l);for(auto&m:right)m->Voltage(r);}
+  double Distance(const Motors& motors){${(['left','right'] as const).filter(side=>d.tractionEncoders?.[side]).map(side=>`if(&motors==&${side})return hardware.read_${d.tractionEncoders![side]}();`).join('')}double sum=0;for(auto&m:motors)sum+=m->Position();return motors.empty()?0:sum/motors.size()*conversion;}
+  double Velocity(const Motors& motors){${(['left','right'] as const).filter(side=>d.tractionEncoders?.[side]).map(side=>`if(&motors==&${side})return hardware.rate_${d.tractionEncoders![side]}();`).join('')}double sum=0;for(auto&m:motors)sum+=m->Velocity();return motors.empty()?0:sum/motors.size()*conversion;}
+  bool FeedbackHealthy(){return std::isfinite(Distance(left))&&std::isfinite(Distance(right))&&std::isfinite(Velocity(left))&&std::isfinite(Velocity(right));}
+  void Voltage(double l,double r){if(!FeedbackHealthy())l=r=0;last=frc::Timer::GetFPGATimestamp().value();for(auto&m:left)if(!m->Ready())l=r=0;for(auto&m:right)if(!m->Ready())l=r=0;for(auto&m:left)m->Voltage(l);for(auto&m:right)m->Voltage(r);}
   double FF(double v){return std::abs(v)<0.001?0:std::copysign(${d.kS},v)+${d.kV}*v;}
 public:
   bool autoReady=false;
-  Drive(){
+  explicit Drive(HardwareIO& hw):hardware(hw){
     ${d.gyro==='ADXRS450'?'gyro.Calibrate();':''}
     frc::SmartDashboard::PutData("Robot pose",&field);
     try {pathplanner::AutoBuilder::configure([this]{return Pose();},[this](frc::Pose2d pose){ResetPose(pose);},[this]{return Speeds();},[this](auto speeds,auto feedforwards){DriveSpeeds(speeds);},std::make_shared<pathplanner::PPLTVController>(0.02_s),pathplanner::RobotConfig::fromGUISettings(),[]{return frc::DriverStation::GetAlliance()==frc::DriverStation::Alliance::kRed;},this);autoReady=true;}
     catch(const std::exception&e){FRC_ReportError(frc::err::Error, "{}", std::string("Autonomous configuration failed: ")+e.what());}
   }
   frc::Pose2d Pose(){return odometry.GetPose();}
-  void ResetPose(frc::Pose2d pose){odometry.ResetPosition(gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)},pose);leftPID.Reset();rightPID.Reset();}
+  void ResetPose(frc::Pose2d pose){if(!FeedbackHealthy()){Stop();return;}odometry.ResetPosition(gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)},pose);leftPID.Reset();rightPID.Reset();}
   frc::ChassisSpeeds Speeds(){return kinematics.ToChassisSpeeds({units::meters_per_second_t{Velocity(left)},units::meters_per_second_t{Velocity(right)}});}
   void Stop(){Voltage(0,0);leftPID.Reset();rightPID.Reset();}
   void Arcade(double forward,double turn){if(!frc::DriverStation::IsTeleopEnabled()){Stop();return;}double l=forward-turn,r=forward+turn,scale=std::max({1.0,std::abs(l),std::abs(r)});Voltage(l/scale*12*${c.maxOutput},r/scale*12*${c.maxOutput});}
   void DriveSpeeds(frc::ChassisSpeeds speeds){auto wheels=kinematics.ToWheelSpeeds(speeds);wheels.Desaturate(units::meters_per_second_t{${d.maxSpeed}});Voltage(FF(wheels.left.value())+leftPID.Calculate(Velocity(left),wheels.left.value()),FF(wheels.right.value())+rightPID.Calculate(Velocity(right),wheels.right.value()));}
-  void Periodic() override {if(frc::DriverStation::IsDisabled()||frc::Timer::GetFPGATimestamp().value()-last>0.1)Stop();odometry.Update(gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)});field.SetRobotPose(Pose());frc::SmartDashboard::PutNumber("Drive/left meters",Distance(left));frc::SmartDashboard::PutNumber("Drive/right meters",Distance(right));frc::SmartDashboard::PutBoolean("Drive/auto configured",autoReady);}
+  void Periodic() override {if(frc::DriverStation::IsDisabled()||frc::Timer::GetFPGATimestamp().value()-last>0.1)Stop();if(FeedbackHealthy())odometry.Update(gyro.GetRotation2d(),units::meter_t{Distance(left)},units::meter_t{Distance(right)});else Stop();field.SetRobotPose(Pose());frc::SmartDashboard::PutNumber("Drive/left meters",Distance(left));frc::SmartDashboard::PutNumber("Drive/right meters",Distance(right));frc::SmartDashboard::PutBoolean("Drive/auto configured",autoReady);}
 };
 class Robot:public frc::TimedRobot {
-  Drive drive;
   HardwareIO hardware;
+  Drive drive{hardware};
   frc::GenericHID driver{${c.driverPort}},operatorController{${c.operatorPort}};
   ${mechanisms.map(s=>`Mechanism mechanism_${s.id}{${q(s.name)},Motors{${p.motors.filter(m=>m.subsystem===s.id).map(motor).join(',')}}};`).join('\n  ')}
   frc::SendableChooser<frc2::Command*> chooser;

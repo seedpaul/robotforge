@@ -20,14 +20,16 @@ export const cppHolonomicIncludes=`#include <array>
 export function cppHolonomicDrive(p:Project){
  const d=p.drive,s=driveType(p)==='swerve',mods=orderedModules(p),corners=['frontLeft','frontRight','backLeft','backRight'] as const;
  const motor=(id:string)=>motorConstructor(p.motors.find(m=>m.id===id)!);
+ const encoders=s?[]:corners.flatMap((c,i)=>d.tractionEncoders?.[c]?[{i,id:d.tractionEncoders[c]!}]:[]);
+ const feedback=(method:'read'|'rate',fallback:string)=>encoders.reduceRight((value,e)=>`(i==${e.i}?hardware.${method}_${e.id}():${value})`,fallback);
  const locations=corners.map((_,i)=>`frc::Translation2d{units::meter_t{${(i<2?1:-1)*(d.wheelbase??.6)/2}},units::meter_t{${(i%2===0?1:-1)*d.trackWidth/2}}}`).join(',');
  const start=p.auto.waypoints[0],end=p.auto.waypoints.at(-1)!,heading=Math.atan2(p.auto.waypoints[1].y-start.y,p.auto.waypoints[1].x-start.x),last=p.auto.waypoints.at(-2)!,endHeading=Math.atan2(end.y-last.y,end.x-last.x);
  const pose=(x:number,y:number,h:number)=>`frc::Pose2d{units::meter_t{${x}},units::meter_t{${y}},frc::Rotation2d{units::radian_t{${h}}}}`;
  return `class Drive:public frc2::SubsystemBase {
+ HardwareIO& hardware;
  // Wheel order: front-left, front-right, back-left, back-right.
  Motors wheels{${(s?mods.map(m=>m.driveMotor):corners.map(c=>d.wheels![c])).map(motor).join(',')}};
  ${s?`Motors steer{${mods.map(m=>motor(m.steerMotor)).join(',')}};
- HardwareIO& hardware;
  std::array<frc::PIDController,4> steering{${corners.map(()=>`frc::PIDController{${d.steerKP??4},0,0}`).join(',')}};
  std::array<frc::Rotation2d,4> angles{};`:''}
  std::array<frc::PIDController,4> velocityPID{${corners.map(()=>`frc::PIDController{${d.kP},0,0}`).join(',')}};
@@ -40,14 +42,14 @@ export function cppHolonomicDrive(p:Project){
  frc::ProfiledPIDController<units::radians> theta{${d.rotationKP??3},0,0,{units::radians_per_second_t{${d.maxAngularSpeed??4}},units::radians_per_second_squared_t{${d.maxAngularSpeed??4}}}};
  frc::HolonomicDriveController follower{frc::PIDController{${d.translationKP??3},0,0},frc::PIDController{${d.translationKP??3},0,0},theta};`}
  bool Healthy(){bool ok=${d.gyro==='Pigeon2'?'gyro.GetYaw().GetStatus().IsOK()&&gyro.GetYaw().GetTimestamp().GetLatency().value()<.25':d.gyro==='NavX'?'gyro.IsConnected()&&!gyro.IsCalibrating()':'gyro.IsConnected()'}&&std::isfinite(gyro.GetRotation2d().Radians().value());for(auto&m:wheels)ok&=m->Ready()&&std::isfinite(m->Position())&&std::isfinite(m->Velocity());
- ${s?`for(auto&m:steer){ok&=m->Ready();}std::array<double,4> readings{${mods.map(m=>`hardware.read_${m.encoder}()-(${m.offset})`).join(',')}};for(int i=0;i<4;i++){ok&=std::isfinite(readings[i]);if(std::isfinite(readings[i]))angles[i]=frc::Rotation2d{units::radian_t{readings[i]*2*3.141592653589793}};}`:''}return ok;}
- double Distance(int i){double value=wheels[i]->Position()*conversion;return std::isfinite(value)?value:0;}
- double Velocity(int i){double value=wheels[i]->Velocity()*conversion;return std::isfinite(value)?value:0;}
+ ${s?`for(auto&m:steer){ok&=m->Ready();}std::array<double,4> readings{${mods.map(m=>`hardware.read_${m.encoder}()-(${m.offset})`).join(',')}};for(int i=0;i<4;i++){ok&=std::isfinite(readings[i]);if(std::isfinite(readings[i]))angles[i]=frc::Rotation2d{units::radian_t{readings[i]*2*3.141592653589793}};}`:''}${encoders.map(e=>`ok&=std::isfinite(hardware.read_${e.id}())&&std::isfinite(hardware.rate_${e.id}());`).join('')}return ok;}
+ double Distance(int i){double value=${feedback('read','wheels[i]->Position()*conversion')};return std::isfinite(value)?value:0;}
+ double Velocity(int i){double value=${feedback('rate','wheels[i]->Velocity()*conversion')};return std::isfinite(value)?value:0;}
  ${s?'wpi::array<frc::SwerveModulePosition,4>':'frc::MecanumDriveWheelPositions'} Positions(){return ${s?'{'+corners.map((_,i)=>`frc::SwerveModulePosition{units::meter_t{Distance(${i})},angles[${i}]}`).join(',')+'}':'{units::meter_t{Distance(0)},units::meter_t{Distance(1)},units::meter_t{Distance(2)},units::meter_t{Distance(3)}}'};}
  double FF(double speed){return std::abs(speed)<.001?0:std::copysign(${d.kS},speed)+${d.kV}*speed;}
 public:
  bool autoReady=false;
- explicit Drive(HardwareIO& hw)${s?':hardware(hw)':''}{
+ explicit Drive(HardwareIO& hw):hardware(hw){
   ${s?'for(auto&pid:steering)pid.EnableContinuousInput(-3.141592653589793,3.141592653589793);':'follower.GetThetaController().EnableContinuousInput(units::radian_t{-3.141592653589793},units::radian_t{3.141592653589793});'}
   ${d.gyro==='ADXRS450'?'if(frc::RobotBase::IsReal())gyro.Calibrate();':''}
   Healthy();odometry=std::make_unique<${s?'frc::SwerveDriveOdometry<4>':'frc::MecanumDriveOdometry'}>(kinematics,gyro.GetRotation2d(),Positions());

@@ -24,12 +24,14 @@ export const drivetrainFields = {
   wheelCOF:z.number().finite().min(.1).max(3).optional(),
   wheels:z.object({frontLeft:ref,frontRight:ref,backLeft:ref,backRight:ref}).strict().optional(),
   modules:z.array(moduleSchema).max(4).optional(),
+  tractionEncoders:z.object({left:ref,right:ref,frontLeft:ref,frontRight:ref,backLeft:ref,backRight:ref}).partial().strict().optional(),
 };
 export const driveType = (p:Project):DriveType => p.drive.type || 'differential';
 export const isHolonomic = (p:Project) => ['swerve','mecanum'].includes(driveType(p));
 export const driveLabel = (p:Project) => driveTypes.find(t=>t.value===driveType(p))!.label;
 export const controlStyle = (p:Project) => isHolonomic(p) ? 'holonomic' : p.controls.driveStyle || (driveType(p)==='tank'?'tank':'arcade');
 export const orderedModules = (p:Project) => corners.map(c=>p.drive.modules?.find(m=>m.corner===c)).filter((m):m is NonNullable<typeof m>=>!!m);
+export const activeTractionEncoders = (p:Project) => (driveType(p)==='swerve'?[]:driveType(p)==='mecanum'?[...corners]:['left','right'] as const).flatMap(key=>{const id=p.drive.tractionEncoders?.[key as keyof NonNullable<Project['drive']['tractionEncoders']>];return id?[{key,id}]:[];});
 export const tractionMotors = (p:Project) => p.motors.filter(m=>m.subsystem==='drive' && (driveType(p)!=='swerve' || p.drive.modules?.some(s=>s.driveMotor===m.id)));
 export function motorRoles(p:Project) { return isHolonomic(p) ? [{value:'wheel',label:'Wheel / drive motor'},...(driveType(p)==='swerve'?[{value:'steer',label:'Steering motor'}]:[])] : [{value:'left',label:'Left side'},{value:'right',label:'Right side'}]; }
 
@@ -49,6 +51,9 @@ export function validateDrivetrain(p:Project):Issue[] {
   const issues:Issue[]=[];const error=(message:string)=>issues.push({level:'error',area:'Hardware',message,subsystems:['drive']});
   const drive=p.motors.filter(m=>m.subsystem==='drive'),type=driveType(p),traction=tractionMotors(p);
   if(!p.subsystems.some(s=>s.id==='drive'))error('The drivetrain subsystem is required.');
+  const distanceEncoders=activeTractionEncoders(p);
+  for(const {key,id} of distanceEncoders){const encoder=p.devices?.find(d=>d.id===id);if(!encoder||encoder.subsystem!=='drive'||productById(encoder.product)?.adapter!=='quadrature')error(`${key}: choose a quadrature distance encoder in the Drivetrain subsystem, or use integrated motor feedback.`);}
+  if(new Set(distanceEncoders.map(e=>e.id)).size!==distanceEncoders.length)error('Each drive side or wheel needs its own external distance encoder.');
   if(new Set(traction.map(m=>`${m.type}:${m.motorKind||'default'}`)).size>1)error('Use the same controller and physical motor model for all traction motors. Steering motors may differ.');
   if(drive.some(m=>m.limit>=0))error('Drive and steering motors cannot use mechanism forward-limit inputs.');
   if(!isHolonomic(p)) {
