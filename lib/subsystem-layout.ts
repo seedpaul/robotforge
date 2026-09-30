@@ -40,7 +40,7 @@ export function placeSubsystem(project:Project, kind:SubsystemKind, point:Layout
   const template=subsystemTemplates.find(t=>t.kind===kind);
   if(!template)throw Error('Choose a subsystem from the parts tray.');
   if(template.drive){
-    const patch=driveType(project)===template.drive?{}:selectDrivetrain(project,template.drive);
+    const patch=project.drive.type===template.drive?{}:selectDrivetrain(project,template.drive);
     const subsystems=project.subsystems.some(s=>s.id==='drive')?project.subsystems:[{id:'drive',name:'Drivetrain',description:''},...project.subsystems];
     if(subsystems.length>20)throw Error('A robot can contain up to 20 subsystems.');
     return {patch:{...patch,subsystems:subsystems.map(s=>s.id==='drive'?{...s,layout:{kind,x:.5,y:.88}}:s)},subsystemId:'drive'};

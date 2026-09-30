@@ -15,10 +15,15 @@ export function readWizardPosition(raw: string | null): WizardPosition {
   return { ...wizardStart };
 }
 
+/** Legacy robots with drive motors already have a working drivetrain selection. */
+export function hasChosenDrivetrain(project: Project): boolean {
+  return !!project.drive.type || project.motors.some(m => m.subsystem === 'drive');
+}
+
 export function wizardProgress(project: Project, findings: Issue[] = validate(project)) {
   const errors = findings.filter(i => i.level === 'error');
   const configurationErrors = errors.filter(i => i.area === 'Configuration');
-  const setupReady = Number.isInteger(project.team) && project.team > 0 && project.team <= 99999
+  const setupReady = hasChosenDrivetrain(project) && Number.isInteger(project.team) && project.team > 0 && project.team <= 99999
     && !!project.name.trim() && project.name.length <= 60
     && project.subsystems.some(s => s.id === 'drive')
     && project.subsystems.every(s => !!s.name.trim() && s.name.length <= 40)

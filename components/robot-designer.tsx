@@ -5,30 +5,28 @@ import { uid, type Project, type Issue } from '@/lib/robot-model';
 import { driveType } from '@/lib/drivetrain';
 import { wizardProgress } from '@/lib/build-wizard';
 import { clampPlacement, moveSubsystem, placeSubsystem, subsystemKind, subsystemPlacement, subsystemTemplates, type SubsystemKind, type LayoutPoint } from '@/lib/subsystem-layout';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SubsystemIcon from './subsystem-icon';
 import { toast } from 'sonner';
 
 type Drag = { kind:SubsystemKind; id?:string; pointer:number; startX:number; startY:number; moved:boolean; point:LayoutPoint };
 export default function RobotDesigner({project,update,issues,onConfigure}:{project:Project;update:(patch:Partial<Project>)=>void;issues:Issue[];onConfigure:(id:string)=>void}) {
   const board=useRef<HTMLDivElement>(null),tracking=useRef<Drag|null>(null);
-  const [tray,setTray]=useState('mechanisms');
   const [armed,setArmed]=useState<SubsystemKind|null>(null),[drag,setDrag]=useState<Drag|null>(null),[message,setMessage]=useState('');
   const progress=wizardProgress(project,issues),type=driveType(project);
   const drive=progress.subsystems.find(s=>s.id==='drive');
   const parts=project.subsystems.filter(s=>s.id!=='drive');
   const point=(x:number,y:number)=>{const rect=board.current!.getBoundingClientRect();return {x:(x-rect.left)/rect.width,y:(y-rect.top)/rect.height};};
   function configure(id:string){setArmed(null);onConfigure(id);}
-  function place(kind:SubsystemKind,position:LayoutPoint){try{const result=placeSubsystem(project,kind,position,uid('subsystem'));update(result.patch);setArmed(null);const name=subsystemTemplates.find(t=>t.kind===kind)!.name;setMessage(name+' placed. Select its icon to configure it.');toast.success(name+' placed. Click its icon to set it up.');}catch(e){toast.error(e instanceof Error?e.message:'Could not place subsystem.');}}
+  function place(kind:SubsystemKind,position:LayoutPoint){try{const result=placeSubsystem(project,kind,position,uid('subsystem'));update(result.patch);setArmed(null);const name=subsystemTemplates.find(t=>t.kind===kind)!.name;setMessage(name+' placed. Select its icon to configure it.');toast.success(name+' placed. Click a subsystem to assemble its components.');}catch(e){toast.error(e instanceof Error?e.message:'Could not place subsystem.');}}
   function start(e:PointerEvent<HTMLButtonElement>,kind:SubsystemKind,id?:string){if(e.button!==0)return;e.stopPropagation();e.currentTarget.setPointerCapture(e.pointerId);tracking.current={kind,id,pointer:e.pointerId,startX:e.clientX,startY:e.clientY,moved:false,point:point(e.clientX,e.clientY)};}
   function moving(e:PointerEvent<HTMLButtonElement>){const current=tracking.current;if(!current||current.pointer!==e.pointerId)return;if(Math.hypot(e.clientX-current.startX,e.clientY-current.startY)>6)current.moved=true;if(current.moved){current.point=point(e.clientX,e.clientY);setDrag({...current});}}
   function finish(e:PointerEvent<HTMLButtonElement>){const current=tracking.current;if(!current||current.pointer!==e.pointerId)return;e.stopPropagation();tracking.current=null;setDrag(null);if(current.moved){const p=point(e.clientX,e.clientY);if(p.x<0||p.x>1||p.y<0||p.y>1){setMessage('Drop inside the chassis to place a subsystem.');return;}if(current.id){update(moveSubsystem(project,current.id,p));setMessage('Subsystem position saved.');}else place(current.kind,p);}else if(current.id)configure(current.id);else setArmed(current.kind);}
   const cancel=()=>{tracking.current=null;setDrag(null);};
   const pointerProps=(kind:SubsystemKind,id?:string)=>({onPointerDown:(e:PointerEvent<HTMLButtonElement>)=>start(e,kind,id),onPointerMove:moving,onPointerUp:finish,onPointerCancel:cancel,onClick:(e:React.MouseEvent<HTMLButtonElement>)=>{e.stopPropagation();if(e.detail===0){if(id)configure(id);else setArmed(kind);}}});
   return <section className="robot-designer" aria-label="Visual robot builder">
-    <div className="designer-heading"><div><h2>Assemble your robot</h2><p>Drag a subsystem onto the chassis. Click its icon to set it up.</p></div><span><CheckCircle2 size={17}/>{progress.subsystems.filter(s=>s.complete).length} of {progress.subsystems.length} configured</span></div>
+    <div className="designer-heading"><div><h2>Assemble your robot</h2><p>Drag a subsystem onto the chassis. Click a subsystem to assemble its components.</p></div><span><CheckCircle2 size={17}/>{progress.subsystems.filter(s=>s.complete).length} of {progress.subsystems.length} configured</span></div>
     <div className="designer-workspace">
-      <aside className="parts-tray" aria-label="Subsystem parts tray"><h3>Subsystems</h3><p>Drag, or select to place.</p><Tabs value={tray} onValueChange={setTray}><TabsList><TabsTrigger value="mechanisms">Mechanisms</TabsTrigger><TabsTrigger value="drive">Drive</TabsTrigger></TabsList></Tabs>{[tray==='drive'].map(drivetrain=><div key={String(drivetrain)}><h4>{drivetrain?'Drivetrains':'Mechanisms'}</h4><div className="parts-grid">{subsystemTemplates.filter(t=>!!t.drive===drivetrain).map(t=><button key={t.kind} className={'part-template '+(armed===t.kind?'selected':'')} aria-label={'Place '+t.name} aria-pressed={armed===t.kind} title={t.description} {...pointerProps(t.kind)} disabled={!t.drive&&project.subsystems.length>=20}><SubsystemIcon kind={t.kind}/><span>{t.name}</span></button>)}</div></div>)}</aside>
+      <aside className="parts-tray" aria-label="Subsystem parts tray"><h3>Mechanisms</h3><p>Drag, or select to place.</p><div className="parts-grid">{subsystemTemplates.filter(t=>!t.drive).map(t=><button key={t.kind} className={'part-template '+(armed===t.kind?'selected':'')} aria-label={'Place '+t.name} aria-pressed={armed===t.kind} title={t.description} {...pointerProps(t.kind)} disabled={project.subsystems.length>=20}><SubsystemIcon kind={t.kind}/><span>{t.name}</span></button>)}</div></aside>
       <div className="designer-canvas-panel">
         <div className="designer-canvas-toolbar"><span><Grip size={16}/>Top view · chassis</span><small>FRONT</small></div>
         {armed&&<div className="placement-prompt" role="status"><MousePointer2 size={18}/><span>Click the chassis to place {subsystemTemplates.find(t=>t.kind===armed)?.name}.</span><button aria-label="Cancel placement" onClick={()=>setArmed(null)}><X size={18}/></button></div>}
@@ -43,6 +41,6 @@ export default function RobotDesigner({project,update,issues,onConfigure}:{proje
         <p className="designer-note">Visual layout only. Set wheel dimensions, gearing, and sensor offsets in drivetrain setup.</p>
         <div className="designer-accessible-parts">{progress.subsystems.map(s=><button key={s.id} onClick={()=>configure(s.id)}><SubsystemIcon kind={subsystemKind(project,s)}/><span>{s.name}<small>{s.status}</small></span></button>)}</div>
       </div>
-    </div><p id="chassis-keyboard-help" className="sr-only">Drag to reposition. Arrow keys move this subsystem. Enter opens guided setup.</p><div className="sr-only" aria-live="polite">{message}</div>
+    </div><p id="chassis-keyboard-help" className="sr-only">Drag to reposition. Arrow keys move this subsystem. Enter opens the subsystem component workspace.</p><div className="sr-only" aria-live="polite">{message}</div>
   </section>;
 }
